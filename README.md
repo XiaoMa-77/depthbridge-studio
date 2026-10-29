@@ -6,7 +6,7 @@
 
 ![采集与定位界面，画面与数值为离线合成示例](docs/images/workbench.png)
 
-无需相机即可运行合成示例。界面、点云与计算均在本地运行，无 CDN、外部推理服务或云端上传。版本 `0.1.0` 的真实 D435 画质、USB 稳定性及机械臂定位精度留待接设备验收；离线测试不代表实机精度。
+无需相机即可运行合成示例。界面、点云与计算均在本地运行，无 CDN、外部推理服务或云端上传。固定 D435 已完成相机侧实测：RGB-D 采集、三维点选、实时界面与导出；机械臂基座标定及绝对测距误差需另行测量，详见 [D435 相机实测记录](docs/D435_相机实测记录.md)。
 
 ## Windows 快速启动
 
@@ -61,6 +61,7 @@ python3.12 -m venv .venv
 | 离线示例 | 明确标为 SYNTHETIC 的方块、球和零件场景 |
 | D435 采集 | RealSense SDK，640×480 RGB/Depth，深度对齐 RGB，SDK 生成 XYZ 点图 |
 | 联动测量 | RGB/深度/叠加选点、邻域中值深度、无效深度拒绝、边缘跨度提示 |
+| 自适应深度显示 | 按当前场景有效深度分位着色，图像标注范围，原始测量值不变 |
 | 三维查看 | 点云旋转缩放、相机/基座坐标轴、表面点和预接近点位置预览 |
 | 固定相机标定 | 相机点与实测基座点刚体拟合，无缩放、不暗中删除离群点 |
 | 独立验证 | 验证点不参与求解，逐点误差、RMS、最大值和 CSV |
@@ -99,6 +100,8 @@ python3.12 -m venv .venv
 ```
 
 浏览器验收运行 `python scripts/verify_browser.py`，使用 Playwright Chromium 或本机 Edge；脚本自动启动临时服务并清理进程。验证边界和实际结果记录在 [测试记录](docs/测试记录.md)。GitHub CI 在 Windows/Linux 跑离线数值与 API 测试，并在 Linux 跑浏览器流程；硬件不在 CI 中。
+
+连接真实相机后，可运行 `python scripts/probe_camera.py --frames 30` 保存重复采样、SDK/接口一致性检查、CSV 和 RGB-D 帧到本地 `data/camera-probe/`。`python scripts/check_live_camera_ui.py` 检查尚未标定的真实相机界面，不切换到示例数据。两者需要 `[dev,realsense]`；原始图像和测量记录位于 Git 忽略的 `data/` 中。
 
 ## 技术来源
 

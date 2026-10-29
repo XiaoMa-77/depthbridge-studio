@@ -83,8 +83,13 @@ class Frame:
 
     def to_packet(self) -> dict:
         valid = np.isfinite(self.depth_m) & (self.depth_m >= 0.05) & (self.depth_m <= 10)
+        lower, upper = (np.percentile(self.depth_m[valid], [2, 98]).astype(float)
+                        if np.any(valid) else (0.2, 1.8))
+        if upper - lower < 0.2:
+            midpoint = (lower + upper) / 2
+            lower, upper = max(0.05, midpoint - 0.1), min(10.0, midpoint + 0.1)
         depth = np.zeros(self.depth_m.shape, dtype=np.uint8)
-        depth[valid] = np.clip((self.depth_m[valid] - 0.2) / 1.6 * 255, 0, 255).astype(np.uint8)
+        depth[valid] = np.clip((self.depth_m[valid] - lower) / (upper - lower) * 255, 0, 255).astype(np.uint8)
         depth_color = cv2.cvtColor(cv2.applyColorMap(255 - depth, cv2.COLORMAP_TURBO), cv2.COLOR_BGR2RGB)
         depth_color[~valid] = [12, 20, 30]
         points, colors = self.cloud()
@@ -92,6 +97,7 @@ class Frame:
                 "description": self.description, "timestamp": self.timestamp,
                 "width": self.intrinsics.width, "height": self.intrinsics.height,
                 "intrinsics": self.intrinsics.to_dict(), "aligned": self.aligned,
+                "depth_range_m": [float(lower), float(upper)],
                 "valid_percent": round(float(valid.mean() * 100), 2),
                 "color": image_url(self.color), "depth": image_url(depth_color),
                 "points": np.round(points, 6).tolist(), "colors": colors.tolist()}

@@ -44,6 +44,7 @@ async function applyPacket(packet,epoch=captureEpoch){
   $('download-cloud').href=`/api/frames/${frame.frame_id}/cloud.ply`;
   selected=null;
   setState(packet.state);drawImage();
+  updateImageModeLabel();
 }
 async function capture(){const epoch=captureEpoch;await applyPacket(await api('/api/frames','POST'),epoch);}
 async function liveLoop(){
@@ -125,9 +126,14 @@ function drawImage(){
   }
   if(boardObservation?.frame_id===frame.frame_id){ctx.fillStyle='#92ffe0';for(const [x,y] of boardObservation.corners){ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fill();}}
 }
+function updateImageModeLabel(){
+  const range=frame?.depth_range_m;
+  const depthLabel=range?`DEPTH / ${range[0].toFixed(2)}–${range[1].toFixed(2)} m · AUTO`:'DEPTH / AUTO';
+  $('image-mode').textContent={color:'RGB / COLOR',depth:depthLabel,overlay:'RGB + DEPTH / OVERLAY'}[imageMode];
+}
 document.querySelectorAll('[data-image]').forEach(e=>e.addEventListener('click',()=>{
   imageMode=e.dataset.image;document.querySelectorAll('[data-image]').forEach(b=>b.classList.toggle('active',b===e));
-  $('image-mode').textContent={color:'RGB / COLOR',depth:'DEPTH / 0.2–1.8 m',overlay:'RGB + DEPTH / OVERLAY'}[imageMode];drawImage();
+  updateImageModeLabel();drawImage();
 }));
 $('image-canvas').addEventListener('click',run(async e=>{
   if(!frame)return;stopLive();const canvas=$('image-canvas'),rect=canvas.getBoundingClientRect();

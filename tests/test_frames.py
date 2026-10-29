@@ -1,9 +1,11 @@
+import base64
 import io
 import json
 import zipfile
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from depthbridge.frames import Frame, cloud_ply, decode_frame, demo_frame, encode_frame
 
@@ -84,3 +86,29 @@ def test_millimeter_archive_scale():
                 data = buffer.getvalue()
             target.writestr(name, data)
     assert decode_frame(stream.getvalue()).sample(200, 200, 0)["depth_m"] == pytest.approx(0.65)
+
+
+def test_far_scene_depth_preview_preserves_contrast_and_measurements():
+    frame = demo_frame()
+    frame.depth_m[:] = np.linspace(2.0, 3.0, frame.intrinsics.width, dtype=np.float32)
+    before = frame.depth_m.copy()
+    packet = frame.to_packet()
+    image_bytes = base64.b64decode(packet["depth"].split(",", 1)[1])
+    with Image.open(io.BytesIO(image_bytes)) as image:
+        pixels = np.asarray(image)
+    assert np.linalg.norm(pixels[200, 80].astype(float) - pixels[200, 560].astype(float)) > 50
+    assert packet["depth_range_m"][0] < 2.1
+    assert packet["depth_range_m"][1] > 2.9
+    np.testing.assert_array_equal(frame.depth_m, before)
+
+
+def test_empty_and_flat_depth_preview_have_finite_nonzero_ranges():
+    frame = demo_frame()
+    frame.depth_m[:] = 0
+    packet = frame.to_packet()
+    assert packet["valid_percent"] == 0
+    lower, upper = packet["depth_range_m"]
+    assert np.isfinite([lower, upper]).all() and upper > lower
+    frame.depth_m[:] = 2
+    lower, upper = frame.to_packet()["depth_range_m"]
+    assert upper - lower >= 0.19
