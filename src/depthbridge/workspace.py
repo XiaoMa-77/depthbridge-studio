@@ -26,16 +26,20 @@ def new_session(source_id: str, synthetic: bool = False) -> dict:
 
 
 class Workspace:
-    def __init__(self):
+    def __init__(self, initial_source: str = "demo"):
+        if initial_source not in {"demo", "idle"}:
+            raise ValueError("初始数据源必须为 idle 或 demo")
         self.lock = threading.RLock()
         self.camera: RealSenseCamera | None = None
         self.frames: OrderedDict[int, Frame] = OrderedDict()
         self.counter = 0
-        self.source_id = "demo"
-        self.sessions = {"demo": new_session("demo", True)}
+        self.capture_namespace = uuid.uuid4().hex
+        self.source_id = initial_source
+        self.sessions = {initial_source: new_session(initial_source, initial_source == "demo")}
         self.imported: Frame | None = None
-        self.source = "demo"
-        self.capture()
+        self.source = initial_source
+        if initial_source == "demo":
+            self.capture()
 
     @property
     def session(self):
@@ -55,6 +59,7 @@ class Workspace:
     def store(self, frame: Frame) -> Frame:
         self.counter += 1
         frame.frame_id = self.counter
+        frame.capture_key = f"{self.capture_namespace}:{self.counter}"
         self.frames[frame.frame_id] = frame
         while len(self.frames) > 8:
             self.frames.popitem(last=False)
@@ -81,10 +86,19 @@ class Workspace:
             raise LookupError("显示帧已过期或数据源已切换，请重新采集后选点")
         return self.frames[frame_id]
 
-    def switch(self, source: str, serial: str = "") -> Frame:
+    def switch(self, source: str, serial: str = "") -> Frame | None:
         with self.lock:
-            if source not in {"demo", "realsense"}:
+            if source not in {"demo", "realsense", "idle"}:
                 raise ValueError("未知数据源")
+            if source == "idle":
+                if self.camera:
+                    self.camera.close()
+                self.camera = None
+                self.source = self.source_id = "idle"
+                self.sessions.setdefault("idle", new_session("idle"))
+                self.frames.clear()
+                self.imported = None
+                return None
             if source == "realsense" and self.camera:
                 self.camera.close()
                 self.camera = None
@@ -124,11 +138,14 @@ class Workspace:
             self.frames.clear()
             return self.store(copy.copy(frame))
 
-    def select(self, frame_id: int, u: int, v: int, radius: int) -> dict:
+    def select(self, frame_id: int, u: int, v: int, radius: int, capture_key: str | None = None) -> dict:
         with self.lock:
             if len(self.session["selections"]) >= 2000:
                 raise ValueError("选点记录已达 2000，请导出会话后开始新会话")
-            sample = self.frame(frame_id).sample(u, v, radius)
+            frame = self.frame(frame_id)
+            if capture_key is not None and capture_key != frame.capture_key:
+                raise LookupError("显示帧属于另一次运行，请重新采集后选点")
+            sample = frame.sample(u, v, radius)
             transform = self.transform()
             sample.update({"id": uuid.uuid4().hex[:10], "source_id": self.source_id,
                            "base_from_tool_at_capture": copy.deepcopy(self.session["base_from_tool"]),

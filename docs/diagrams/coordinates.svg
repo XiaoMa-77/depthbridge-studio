@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="550" viewBox="0 0 1200 550" role="img" aria-label="From a pixel to a robot-frame position.">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#8797c1" stroke-width="1.2"/></marker></defs>
+<rect width="1200" height="550" rx="18" fill="#f5f5f2"/>
+<g font-family="Arial, sans-serif"><text x="36" y="40" font-size="12" fill="#3555e8" letter-spacing="2">DEPTHBRIDGE / ENGINEERING NOTES</text>
+<text x="36" y="83" font-size="30" font-weight="600" fill="#1d2028">From a pixel to a robot-frame position.</text>
+<text x="36" y="111" font-size="15" fill="#6b7180">Display units: millimetres. Geometry and transform translations: metres.</text>
+<rect x="36" y="155" width="246" height="152" rx="12" fill="white" stroke="#dce2ee"/>
+<text x="54" y="183" font-size="11" letter-spacing="1.3" fill="#25304a" opacity=".65">01 / IMAGE</text>
+<text x="54" y="214" font-size="19" font-weight="600" fill="#25304a">Pixel + aligned depth</text>
+<text x="54" y="243" font-size="13" fill="#25304a" opacity=".8">Source pixel (u, v), optical Z</text>
+<text x="54" y="266" font-size="13" fill="#25304a" opacity=".8">Valid centre depth required</text>
+<text x="54" y="289" font-size="13" fill="#25304a" opacity=".8">Neighbourhood median optional</text>
+<rect x="330" y="155" width="246" height="152" rx="12" fill="white" stroke="#dce2ee"/>
+<text x="348" y="183" font-size="11" letter-spacing="1.3" fill="#25304a" opacity=".65">02 / CAMERA</text>
+<text x="348" y="214" font-size="19" font-weight="600" fill="#25304a">Camera point p_camera</text>
+<text x="348" y="243" font-size="13" fill="#25304a" opacity=".8">D435: SDK XYZ / pixel ray</text>
+<text x="348" y="266" font-size="13" fill="#25304a" opacity=".8">X right / Y down / Z forward</text>
+<text x="348" y="289" font-size="13" fill="#25304a" opacity=".8">Z is optical depth, not range</text>
+<rect x="624" y="155" width="246" height="152" rx="12" fill="#3555e8" stroke="#3555e8"/>
+<text x="642" y="183" font-size="11" letter-spacing="1.3" fill="white" opacity=".65">03 / TRANSFORM</text>
+<text x="642" y="214" font-size="19" font-weight="600" fill="white">R @ p_camera + t</text>
+<text x="642" y="243" font-size="13" fill="white" opacity=".8">T_base_from_camera</text>
+<text x="642" y="266" font-size="13" fill="white" opacity=".8">Rigid point fit: no scale</text>
+<text x="642" y="289" font-size="13" fill="white" opacity=".8">At least 4 non-collinear pairs</text>
+<rect x="918" y="155" width="246" height="152" rx="12" fill="white" stroke="#dce2ee"/>
+<text x="936" y="183" font-size="11" letter-spacing="1.3" fill="#25304a" opacity=".65">04 / ROBOT BASE</text>
+<text x="936" y="214" font-size="19" font-weight="600" fill="#25304a">Point p_base</text>
+<text x="936" y="243" font-size="13" fill="#25304a" opacity=".8">Measured TCP correspondence</text>
+<text x="936" y="266" font-size="13" fill="#25304a" opacity=".8">Installation-specific transform</text>
+<text x="936" y="289" font-size="13" fill="#25304a" opacity=".8">Independent new points verify fit</text>
+<path d="M285 232L322 232" stroke="#8797c1" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<path d="M579 232L616 232" stroke="#8797c1" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<path d="M873 232L910 232" stroke="#8797c1" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<text x="36" y="359" font-size="14" fill="#667591">FIXED CAMERA    T_base_from_camera is estimated from matching physical points in camera and base coordinates.</text>
+<text x="36" y="396" font-size="14" fill="#667591">WRIST CAMERA    T_base_from_camera = T_base_from_tool @ T_tool_from_camera; use the capture-time robot pose.</text>
+<text x="36" y="433" font-size="14" fill="#667591">HELD-OUT CHECK   error_mm = 1000 * norm(predicted_base - measured_base). Validation points never enter the fit.</text>
+<text x="36" y="482" font-size="14" fill="#667591">A low fitting residual measures consistency of recorded pairs. Task accuracy requires new measured physical points.</text>
+</g></svg>

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "depthbridge-studio"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local RGB-D calibration workbench for pixel-to-robot coordinate inspection"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,7 +22,7 @@ depthbridge = "depthbridge.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-depthbridge = ["static/*"]
+depthbridge = ["static/*", "static/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

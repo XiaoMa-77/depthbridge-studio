@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="550" viewBox="0 0 1200 550" role="img" aria-label="Measure the frame that is actually visible.">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#8797c1" stroke-width="1.2"/></marker></defs>
+<rect width="1200" height="550" rx="18" fill="#f5f5f2"/>
+<g font-family="Arial, sans-serif"><text x="36" y="40" font-size="12" fill="#3555e8" letter-spacing="2">DEPTHBRIDGE / ENGINEERING NOTES</text>
+<text x="36" y="83" font-size="30" font-weight="600" fill="#1d2028">Measure the frame that is actually visible.</text>
+<text x="36" y="111" font-size="15" fill="#6b7180">Sequential preview requests and capture identity keep clicks attached to a specific RGB-D frame.</text>
+<rect x="36" y="155" width="246" height="152" rx="12" fill="white" stroke="#dce2ee"/>
+<text x="54" y="183" font-size="11" letter-spacing="1.3" fill="#25304a" opacity=".65">01 / CAPTURE</text>
+<text x="54" y="214" font-size="19" font-weight="600" fill="#25304a">Acquire + cache</text>
+<text x="54" y="243" font-size="13" fill="#25304a" opacity=".8">Immutable RGB / depth / XYZ</text>
+<text x="54" y="266" font-size="13" fill="#25304a" opacity=".8">Last 8 frames in workspace</text>
+<text x="54" y="289" font-size="13" fill="#25304a" opacity=".8">frame_id + process capture_key</text>
+<rect x="330" y="155" width="246" height="152" rx="12" fill="white" stroke="#dce2ee"/>
+<text x="348" y="183" font-size="11" letter-spacing="1.3" fill="#25304a" opacity=".65">02 / DISPLAY</text>
+<text x="348" y="214" font-size="19" font-weight="600" fill="#25304a">Commit loaded images</text>
+<text x="348" y="243" font-size="13" fill="#25304a" opacity=".8">Wait for RGB + depth images</text>
+<text x="348" y="266" font-size="13" fill="#25304a" opacity=".8">Show one consistent frame</text>
+<text x="348" y="289" font-size="13" fill="#25304a" opacity=".8">Preview: next request after 400 ms</text>
+<rect x="624" y="155" width="246" height="152" rx="12" fill="#3555e8" stroke="#3555e8"/>
+<text x="642" y="183" font-size="11" letter-spacing="1.3" fill="white" opacity=".65">03 / CLICK</text>
+<text x="642" y="214" font-size="19" font-weight="600" fill="white">Freeze + select</text>
+<text x="642" y="243" font-size="13" fill="white" opacity=".8">Pause preview; invalidate updates</text>
+<text x="642" y="266" font-size="13" fill="white" opacity=".8">Send displayed ID + capture_key</text>
+<text x="642" y="289" font-size="13" fill="white" opacity=".8">Sample the cached frame</text>
+<rect x="918" y="155" width="246" height="152" rx="12" fill="white" stroke="#dce2ee"/>
+<text x="936" y="183" font-size="11" letter-spacing="1.3" fill="#25304a" opacity=".65">04 / TRACE</text>
+<text x="936" y="214" font-size="19" font-weight="600" fill="#25304a">Inspect + export</text>
+<text x="936" y="243" font-size="13" fill="#25304a" opacity=".8">XYZ / source / time / pixel</text>
+<text x="936" y="266" font-size="13" fill="#25304a" opacity=".8">Expired or mismatched frame: 409</text>
+<text x="936" y="289" font-size="13" fill="#25304a" opacity=".8">Save JSON + frame ZIP</text>
+<path d="M285 232L322 232" stroke="#8797c1" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<path d="M579 232L616 232" stroke="#8797c1" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<path d="M873 232L910 232" stroke="#8797c1" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+<text x="36" y="362" font-size="14" fill="#667591">SESSION RESTORE    History stays available, while points from another capture are never painted onto a new frame.</text>
+<text x="36" y="401" font-size="14" fill="#667591">MOTION LAYER       Pointer-transparent particles, at most 30 fps; pauses when hidden; reduced-motion and manual off.</text>
+<text x="36" y="440" font-size="14" fill="#667591">PIXEL MAPPING      Image aspect ratio is preserved at every breakpoint; transitions do not move the measurement canvas.</text>
+<text x="36" y="489" font-size="14" fill="#667591">The browser sends capture_key for selection validation. Older API clients may omit it; frame expiry still applies.</text>
+</g></svg>

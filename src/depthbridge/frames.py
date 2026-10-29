@@ -28,6 +28,7 @@ class Frame:
     serial: str = ""
     description: str = ""
     frame_id: int = 0
+    capture_key: str = ""
 
     def __post_init__(self):
         shape = (self.intrinsics.height, self.intrinsics.width)
@@ -64,6 +65,7 @@ class Frame:
         return {"pixel": [u, v], "camera_m": point.tolist(), "depth_m": depth,
                 "spread_mm": spread * 1000, "valid_fraction": float(valid.size / patch.size),
                 "radius": radius, "frame_id": self.frame_id, "timestamp": self.timestamp,
+                "capture_key": self.capture_key,
                 "source": self.source, "serial": self.serial,
                 "warning": "邻域深度变化较大，可能位于边缘或混入背景，建议半径改为 0 或重新选点" if spread > 0.01 else ""}
 
@@ -94,6 +96,7 @@ class Frame:
         depth_color[~valid] = [12, 20, 30]
         points, colors = self.cloud()
         return {"frame_id": self.frame_id, "source": self.source, "serial": self.serial,
+                "capture_key": self.capture_key,
                 "description": self.description, "timestamp": self.timestamp,
                 "width": self.intrinsics.width, "height": self.intrinsics.height,
                 "intrinsics": self.intrinsics.to_dict(), "aligned": self.aligned,
@@ -144,6 +147,7 @@ def encode_frame(frame: Frame) -> bytes:
     metadata = {"schema": "depthbridge-frame-v1", "intrinsics": frame.intrinsics.to_dict(),
                 "depth_scale_m": 1.0, "aligned_to": "color", "timestamp": frame.timestamp,
                 "source": frame.source, "serial": frame.serial, "description": frame.description}
+    metadata["capture_key"] = frame.capture_key
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         image = io.BytesIO()
         Image.fromarray(frame.color).save(image, format="PNG")
@@ -185,6 +189,7 @@ def decode_frame(data: bytes) -> Frame:
             return Frame(color, depth.astype(np.float32) * scale, intrinsics,
                          str(metadata.get("source", "import")), float(metadata.get("timestamp", 0)),
                          xyz=xyz, serial=str(metadata.get("serial", "")),
+                         capture_key=str(metadata.get("capture_key", "")),
                          description=str(metadata.get("description", "导入 RGB-D 数据")))
     except (KeyError, TypeError, zipfile.BadZipFile, OSError) as exc:
         raise ValueError(f"RGB-D 文件包无效：{exc}") from exc

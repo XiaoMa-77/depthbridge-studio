@@ -2,61 +2,54 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark"><title>DepthBridge Studio · RGB-D 标定工作台</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121c25'/%3E%3Cpath d='M7 23V9h9v14h9V9' fill='none' stroke='%2369ddc0' stroke-width='3'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/style.css">
+  <meta name="color-scheme" content="light"><title>DepthBridge Studio · RGB-D 标定工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233555e8'/%3E%3Cpath d='M7 23V9h9v14h9V9' fill='none' stroke='%23ffffff' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="preload" href="/static/fonts/depthbridge-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/depthbridge-display.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/workbench.css">
 </head>
 <body>
+<canvas id="ambient-particles" aria-hidden="true"></canvas>
+<div class="ambient-glow" aria-hidden="true"></div>
 <aside class="sidebar">
-  <a class="brand" href="/"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 27V9h12v18h12V9"/></svg><span>DepthBridge<small>STUDIO / 0.1</small></span></a>
+  <a class="brand" href="/" aria-label="DepthBridge 首页"><span class="brand-mark"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M7 25V11l11-6 11 6v14l-11 6zM7 11l11 6 11-6M18 17v14"/><path d="M7 25l11-6 11 6"/></svg></span><span>DepthBridge<small>VISION WORKSPACE</small></span></a>
   <div class="nav-label">工作空间 <span>WORKSPACE</span></div>
   <nav aria-label="工作空间">
-    <button class="nav active" data-tab="workbench"><span>⌖</span>采集与定位<i>01</i></button>
-    <button class="nav" data-tab="calibration"><span>⌘</span>坐标标定<i>02</i></button>
-    <button class="nav" data-tab="validation"><span>▥</span>误差验证<i>03</i></button>
-    <button class="nav" data-tab="guide"><span>↗</span>真机准备<i>04</i></button>
+    <button class="nav active" data-tab="workbench" aria-label="采集与定位" title="采集与定位" aria-current="page"><svg viewBox="0 0 24 24"><path d="M8 3H4a1 1 0 0 0-1 1v4m13-5h4a1 1 0 0 1 1 1v4M3 16v4a1 1 0 0 0 1 1h4m8 0h4a1 1 0 0 0 1-1v-4M8 12h8m-4-4v8"/></svg><span>采集</span><i>01</i></button>
+    <button class="nav" data-tab="calibration" aria-label="坐标标定" title="坐标标定"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5zM12 2v6m0 8v6M2 12h6m8 0h6"/><circle cx="12" cy="12" r="2"/></svg><span>标定</span><i>02</i></button>
+    <button class="nav" data-tab="validation" aria-label="误差验证" title="误差验证"><svg viewBox="0 0 24 24"><path d="M4 3v17h17M8 16v-5m5 5V6m5 10V9M8 6l3-3 3 3"/></svg><span>验证</span><i>03</i></button>
   </nav>
-  <div class="source-card">
-    <div class="card-eyebrow">数据源 <span id="source-dot" class="dot amber"></span></div>
-    <strong id="source-name">离线合成场景</strong><p id="source-desc">无需相机，先熟悉完整流程</p>
-    <label for="device-select">RealSense 设备</label>
-    <select id="device-select"><option value="">自动选择已连接设备</option></select>
-    <div class="button-row"><button id="detect-devices" class="button subtle">检测设备</button><button id="connect-camera" class="button primary">连接 D435</button></div>
-    <p id="device-message" class="small">优先使用 USB 3 数据线</p>
-    <button id="load-demo" class="button full subtle">切回离线示例</button>
-  </div>
-  <div class="sidebar-footer"><span class="dot mint"></span>本地处理 · 无外部推理服务<br><span>相机 → 坐标 → 验证</span></div>
+  <div class="sidebar-tools"><button data-open="data-dialog" aria-label="数据与示例" title="数据与示例"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v11H3zM3 7V4h7l2 3"/></svg><span>数据与示例</span><span>↗</span></button><button data-open="help-dialog" aria-label="使用帮助" title="使用帮助"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3v1"/></svg><span>使用帮助</span><kbd>?</kbd></button><button data-open="appearance-dialog" aria-label="外观与动效" title="外观与动效"><svg viewBox="0 0 24 24"><path d="M12 3l2 6 6 3-6 2-2 7-2-7-7-2 7-3zM20 3v4m-2-2h4"/></svg><span>外观与动效</span><span class="effects-indicator"></span></button></div>
+  <div class="sidebar-footer"><span class="dot mint"></span>本地工作空间 <span class="build-label">v0.2</span></div>
 </aside>
 <main>
-  <header class="topbar"><div><div class="eyebrow">RGB-D CALIBRATION WORKBENCH</div><h1 id="page-title">采集与定位<span> / INSPECT</span></h1></div>
-    <div class="header-actions"><label class="button subtle upload">导入 RGB-D<input id="frame-file" type="file" accept=".zip"></label><a class="button subtle" href="/api/exports/session.json" download>导出会话 ↗</a></div>
-  </header>
-  <div id="source-banner" class="source-banner"><span class="badge amber">SYNTHETIC</span><span id="banner-text">当前是合成场景。坐标与变换用于演示，连接相机后单独标定。</span></div>
+  <header class="topbar"><a class="wordmark" href="/">DepthBridge <span>STUDIO</span></a><div class="header-actions"><button id="device-launch" class="device-launch" data-open="connection-dialog"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="3"/><circle cx="9" cy="12.5" r="2.3"/><circle cx="16" cy="12.5" r="1.3"/></svg><span id="header-device-name">连接相机</span><span>⌄</span></button><span id="session-state" class="session-state"><i class="dot"></i>等待设备</span><button data-open="appearance-dialog" class="button icon-button" aria-label="外观设置" title="外观与动效"><svg viewBox="0 0 24 24"><path d="M12 3l2 6 6 3-6 2-2 7-2-7-7-2 7-3z"/></svg></button><a class="button subtle" href="/api/exports/session.json" download>保存会话 <span>↗</span></a></div></header>
+  <div id="source-banner" class="source-banner idle"><span class="badge">WAITING</span><span id="banner-text">连接深度相机，开始采集真实空间。</span><span id="source-session-count" class="muted">0 个测量点</span></div>
 
   <section id="tab-workbench" class="tab active">
-    <div class="workspace-heading"><div><h2>从像素到三维位置</h2><p>点选左侧图像，联动检查深度、点云与基座坐标。</p></div><div class="button-row"><button id="live-toggle" class="button subtle" disabled>实时预览</button><button id="capture-frame" class="button primary">↻ 采集一帧</button></div></div>
-    <div class="metrics"><div><span>图像尺寸</span><strong id="metric-resolution">—</strong><small>彩色 / 深度已对齐</small></div><div><span>有效深度占比</span><strong id="metric-valid">—</strong><small>当前画面</small></div><div><span>坐标变换</span><strong id="metric-transform">示例变换</strong><small id="metric-direction">相机 → 机械臂基座</small></div><div><span>当前帧</span><strong id="metric-frame">—</strong><small id="metric-time">等待采集</small></div></div>
+    <div class="workspace-heading inspect-heading"><div><div class="eyebrow">SPATIAL VISION WORKSPACE</div><h1 id="page-title">空间测量<span> / INSPECT</span></h1><p>从真实像素，抵达三维空间。</p></div><div class="button-row"><button id="live-toggle" class="button subtle" disabled>实时预览</button><button id="capture-frame" class="button primary"><svg viewBox="0 0 24 24"><path d="M5 7h4l2-3h4l2 3h2a2 2 0 0 1 2 2v9H3V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="12" r="4"/></svg>采集一帧 <kbd>C</kbd></button></div></div>
+    <div class="metrics"><div><span>图像尺寸</span><strong id="metric-resolution">—</strong><small>彩色 / 深度已对齐</small></div><div><span>有效深度占比</span><strong id="metric-valid">—</strong><small>当前画面</small></div><div><span>坐标变换</span><strong id="metric-transform">尚未标定</strong><small id="metric-direction">相机 → 机械臂基座</small></div><div><span>当前帧</span><strong id="metric-frame">—</strong><small id="metric-time">等待采集</small></div></div>
     <div class="inspect-layout">
       <div class="visual-area">
         <div class="views">
           <article class="panel image-panel"><div class="panel-head"><span><b class="tiny-square"></b>RGB-D 视图</span><div class="segmented"><button class="active" data-image="color">RGB</button><button data-image="depth">深度</button><button data-image="overlay">叠加</button></div></div>
-            <div class="image-stage"><canvas id="image-canvas" width="640" height="480" aria-label="RGB-D 图像，点击选择测量点" role="img"></canvas><div class="image-caption"><span id="image-mode">RGB / COLOR</span><span>点击图像选点 ⊕</span></div></div>
-            <div class="panel-foot"><span><i class="dot mint"></i>深度对齐到 RGB</span><span id="frame-source-label">合成数据</span></div>
+            <div class="image-stage"><div id="image-empty" class="stage-empty"><span class="empty-scanner"><svg viewBox="0 0 64 64"><path d="M18 12H8v10m38-10h10v10M8 42v10h10m28 0h10V42"/><rect x="18" y="22" width="28" height="20" rx="5"/><circle cx="27" cy="32" r="4"/><circle cx="38" cy="32" r="2"/></svg></span><strong>等待相机画面</strong><p>从顶部连接 D435，开始你的第一次测量</p><span class="empty-hint"><i class="dot mint"></i>真实 RGB · 对齐深度 · 三维坐标</span></div><canvas id="image-canvas" tabindex="0" width="640" height="480" aria-label="RGB-D 图像，点击选择测量点" role="img"></canvas><div class="image-caption"><span id="image-mode">RGB / COLOR</span><span id="hover-pixel">点击选点 ⊕</span></div></div>
+            <div class="panel-foot"><span><i class="dot mint"></i>深度对齐到 RGB</span><span id="frame-source-label">等待采集</span></div>
           </article>
-          <article class="panel cloud-panel"><div class="panel-head"><span><b class="tiny-square mint-bg"></b>三维坐标预览</span><div class="button-row"><select id="cloud-coordinates" aria-label="点云坐标系"><option value="camera">相机坐标</option><option value="base">基座坐标</option></select><button class="icon-button" id="reset-view" title="复位视角">⤢</button></div></div>
-            <div class="cloud-stage"><canvas id="cloud-canvas" aria-label="可旋转三维点云" role="img"></canvas><div class="cloud-hint">拖动旋转 · 滚轮缩放 · 双击复位</div><div id="cloud-label" class="cloud-label">CAMERA OPTICAL FRAME</div></div>
+          <article class="panel cloud-panel"><div class="panel-head"><span><b class="tiny-square mint-bg"></b>三维点云</span><div class="button-row"><select id="cloud-palette" aria-label="点云配色"><option value="ice">冷白</option><option value="rgb">原色</option></select><select id="cloud-coordinates" aria-label="点云坐标系"><option value="camera">相机坐标</option><option value="base">基座坐标</option></select><button class="icon-button" id="reset-view" title="复位视角">⤢</button></div></div>
+            <div class="cloud-stage"><div id="cloud-empty" class="stage-empty cloud-empty"><span class="empty-orbit" aria-hidden="true"></span><strong>三维空间将在这里呈现</strong><p>与 RGB-D 画面同步的空间视图</p></div><canvas id="cloud-canvas" aria-label="可旋转三维点云" role="img"></canvas><div class="cloud-hint">拖动旋转 · 滚轮缩放 · 双击复位</div><div id="cloud-label" class="cloud-label">CAMERA OPTICAL FRAME</div></div>
             <div class="panel-foot"><span><i class="axis red"></i>X <i class="axis green"></i>Y <i class="axis blue"></i>Z</span><span id="cloud-count">— points</span></div>
           </article>
         </div>
-        <article class="panel chain-panel"><div class="panel-head"><span>坐标转换链</span><span class="muted">长度单位：mm</span></div><div class="coordinate-chain"><div><small>01 / IMAGE</small><strong id="chain-pixel">选择像素</strong><span>像素 (u, v)</span></div><b>→</b><div><small>02 / DEPTH</small><strong id="chain-depth">—</strong><span>光轴深度 Z</span></div><b>→</b><div><small>03 / CAMERA</small><strong id="chain-camera">—</strong><span>相机光学坐标</span></div><b>→</b><div><small>04 / BASE</small><strong id="chain-base">—</strong><span>机械臂基座坐标</span></div></div></article>
-        <article class="panel recent-panel"><div class="panel-head"><span>最近选点</span><span class="muted">保留采集时的坐标快照</span></div><div class="table-scroll"><table><thead><tr><th>点位</th><th>像素</th><th>深度 / mm</th><th>相机 XYZ / mm</th><th>基座 XYZ / mm</th></tr></thead><tbody id="recent-points"><tr><td colspan="5" class="empty">点击图像开始测量</td></tr></tbody></table></div></article>
+        <details class="panel chain-panel"><summary>坐标转换过程 <span>像素 → 深度 → 相机 → 基座</span></summary><div class="coordinate-chain"><div><small>01 / IMAGE</small><strong id="chain-pixel">选择像素</strong><span>像素 (u, v)</span></div><b>→</b><div><small>02 / DEPTH</small><strong id="chain-depth">—</strong><span>光轴深度 Z</span></div><b>→</b><div><small>03 / CAMERA</small><strong id="chain-camera">—</strong><span>相机光学坐标</span></div><b>→</b><div><small>04 / BASE</small><strong id="chain-base">—</strong><span>机械臂基座坐标</span></div></div></details>
+        <article class="panel recent-panel"><div class="panel-head"><span>最近选点</span><span class="muted">记录采集时的坐标快照</span></div><div class="table-scroll"><table><thead><tr><th>点位</th><th>像素</th><th>深度 / mm</th><th>相机 XYZ / mm</th><th>基座 XYZ / mm</th></tr></thead><tbody id="recent-points"><tr><td colspan="5" class="empty">点击图像开始测量</td></tr></tbody></table></div></article>
       </div>
-      <aside class="selection-panel panel"><div class="panel-head"><span>测量详情</span><span class="badge mint">POINT</span></div><div class="selection-body"><div class="point-title"><span id="selected-label">尚未选择</span><small id="selected-pixel">点击 RGB 或深度图</small></div>
-        <label for="sample-radius">深度采样半径</label><select id="sample-radius"><option value="0">单像素 · 边缘或精确定位</option><option value="1">1 px · 3 × 3 邻域中值</option><option value="2" selected>2 px · 5 × 5 邻域中值</option><option value="3">3 px · 7 × 7 邻域中值</option></select>
+      <aside class="selection-panel panel"><div class="panel-head"><span>测量点</span><span class="badge mint">POINT</span></div><div class="selection-body"><div class="point-title"><span class="selection-glyph" aria-hidden="true">⌖</span><span id="selected-label">选择一个测量点</span><small id="selected-pixel">点击 RGB 或深度图</small></div>
         <div class="detail-group"><h3>相机坐标 <span>CAMERA / mm</span></h3><dl class="xyz"><div><dt class="x">X</dt><dd id="camera-x">—</dd></div><div><dt class="y">Y</dt><dd id="camera-y">—</dd></div><div><dt class="z">Z</dt><dd id="camera-z">—</dd></div></dl></div>
-        <div class="detail-group"><h3>基座坐标 <span>BASE / mm</span></h3><dl class="xyz"><div><dt class="x">X</dt><dd id="base-x">—</dd></div><div><dt class="y">Y</dt><dd id="base-y">—</dd></div><div><dt class="z">Z</dt><dd id="base-z">—</dd></div></dl><p id="base-hint" class="small">使用当前坐标变换重新计算</p></div>
-        <div class="quality-row"><span>邻域深度跨度 P90−P10</span><b id="depth-spread">—</b></div><p id="point-warning" class="warning-text"></p>
-        <button id="use-for-calibration" class="button primary full" disabled>＋ 记录为标定点</button><button id="use-for-validation" class="button subtle full" disabled>记录为独立验证点</button>
+        <details class="detail-group base-group" id="base-details"><summary>基座坐标 <span>标定后可用</span></summary><dl class="xyz"><div><dt class="x">X</dt><dd id="base-x">—</dd></div><div><dt class="y">Y</dt><dd id="base-y">—</dd></div><div><dt class="z">Z</dt><dd id="base-z">—</dd></div></dl><p id="base-hint" class="small">使用当前坐标变换重新计算</p></details>
+        <details class="sampling-settings"><summary>采样与深度质量</summary>        <label for="sample-radius">深度采样半径</label><select id="sample-radius"><option value="0">单像素 · 边缘或精确定位</option><option value="1">1 px · 3 × 3 邻域中值</option><option value="2" selected>2 px · 5 × 5 邻域中值</option><option value="3">3 px · 7 × 7 邻域中值</option></select>
+        <div class="quality-row"><span>邻域深度跨度 P90−P10</span><b id="depth-spread">—</b></div></details><p id="point-warning" class="warning-text"></p>
+        <button id="use-for-calibration" class="button primary full" disabled>＋ 记录标定点</button><button id="copy-coordinates" class="button subtle full" disabled>复制相机坐标 <span>⧉</span></button><button id="use-for-validation" class="button subtle full" disabled>记录为独立验证点</button>
         <details class="preview-settings"><summary>预接近位置预览</summary><p class="small">以基座 +Z 为接近方向。仅预览表面点与高度偏移。</p><label>预接近高度 / mm<input id="clearance" type="number" min="0" max="1000" value="80"></label><label>表面 Z 偏移 / mm<input id="surface-offset" type="number" min="-500" max="500" value="0"></label><button id="save-preview" class="button subtle full">更新预览设置</button></details>
         <div class="download-row"><a id="download-frame" href="#">保存 RGB-D 帧 ↗</a><a id="download-cloud" href="#">导出 PLY ↗</a></div>
       </div></aside>
@@ -80,14 +73,20 @@
     <article class="panel"><div class="panel-body"><h3>结果怎么判断</h3><p>先看误差是否满足你的夹爪、目标尺寸和任务要求，再检查工作区边缘与不同高度。这里显示的是记录点的定位误差，完整抓取还受 TCP、夹持位置、运动与目标形状影响。</p><p class="small">可视化预接近点沿基座 +Z 偏移，没有进行机械臂逆解、碰撞检测或动作执行。</p></div></article>
   </section>
 
-  <section id="tab-guide" class="tab">
-    <div class="workspace-heading"><div><h2>明天：连接固定支架上的 D435</h2><p>先确认数据，再求解坐标关系，最后做独立验证。</p></div><span class="badge mint">INTEL REALSENSE D435</span></div>
-    <div class="guide-grid"><article class="panel"><div class="panel-head">连接前</div><div class="panel-body"><ol><li>将 D435 固定，测试期间保持位置与角度不变。</li><li>使用 USB 3 数据线，关闭 RealSense Viewer 等占用相机的程序。</li><li>项目虚拟环境安装 RealSense 扩展：<code>python -m pip install -e ".[realsense]"</code></li><li>点击左侧“检测设备”，选择序列号，然后“连接 D435”。</li></ol><a href="https://github.com/realsenseai/librealsense" target="_blank" rel="noopener noreferrer">RealSense 官方 SDK ↗</a></div></article><article class="panel"><div class="panel-head">开始测量</div><div class="panel-body"><ol><li>检查 RGB、深度和叠加视图，确认物体边缘对应。</li><li>在哑光平面上选点，检查深度是否合理。物体边缘用单像素采样。</li><li>相机和目标静止时，采集至少 4 组同名点，推荐 8–12 组。</li><li>填入已标定 TCP 测得的同一点基座坐标，单位 mm。</li><li>求解后留出新的物理点，记录为“独立验证”。</li><li>导出会话、标定、CSV 和必要的 RGB-D 帧。</li></ol></div></article></div>
-    <article class="panel"><div class="panel-head">排查提示</div><div class="panel-body troubleshooting"><div><h3>检测不到相机</h3><p>检查 USB、驱动和进程占用。终端运行 <code>depthbridge --devices</code> 获取检测结果。</p></div><div><h3>深度缺失或跳动</h3><p>检查距离、反光、透明材质和照明；先用普通纸面确认，再测目标物体。</p></div><div><h3>坐标明显错位</h3><p>核对基座/工具坐标系、mm 与 m、矩阵方向，以及相机是否被移动。</p></div><div><h3>保存与恢复</h3><p>退出前导出会话；恢复时先连接同一序列号设备，再导入会话。改变安装位置后重新标定。</p></div></div></article>
-    <article class="panel"><div class="panel-head">会话文件</div><div class="panel-body"><p>会话包含选点、对应点、变换及观测数据。完整图像请另外保存 RGB-D 帧。当前工作空间在进程内保留，退出前导出。</p><label class="button subtle upload">导入会话 JSON<input id="session-file" type="file" accept=".json"></label></div></article>
-  </section>
   <footer class="main-footer"><span>DEPTHBRIDGE STUDIO</span><span>距离：内部 m · 显示 mm <b> / </b> 变换：目标坐标系 ← 源坐标系</span></footer>
 </main>
+
+<dialog id="connection-dialog" class="utility-dialog connection-dialog"><div class="dialog-head"><div><div class="eyebrow">DEVICE / CONNECTION</div><h2>设备连接</h2></div><button class="close-button" data-close aria-label="关闭">×</button></div><div class="dialog-body">  <div class="source-card" id="connection-card">
+    <div class="card-eyebrow">相机连接 <span id="source-status" class="connection-status">待连接</span></div>
+    <div class="device-identity"><span class="device-icon"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="3"/><circle cx="9" cy="12.5" r="2.3"/><circle cx="16" cy="12.5" r="1.3"/><path d="M9 18v3m6-3v3M8 4h8"/></svg></span><div><strong id="source-name">连接深度相机</strong><p id="source-desc">Intel RealSense · RGB-D</p></div><span id="source-dot" class="dot"></span></div>
+    <div id="device-controls"><label for="device-select">可用设备</label><select id="device-select"><option value="">正在检测设备…</option></select><div class="button-row"><button id="connect-camera" class="button primary">连接 D435 <span>↗</span></button><button id="detect-devices" class="button subtle square-button" aria-label="刷新设备" title="刷新设备">↻</button></div></div>
+    <p id="device-message" class="small">连接后即可查看真实深度与三维坐标</p>
+    <button id="disconnect-camera" class="button subtle full" hidden>断开相机</button>
+  </div></div></dialog>
+<dialog id="data-dialog" class="utility-dialog"><div class="dialog-head"><div><div class="eyebrow">DATA / WORKSPACE</div><h2>数据与会话</h2></div><button class="close-button" data-close aria-label="关闭">×</button></div><div class="dialog-body"><p class="dialog-intro">导入记录继续分析，或保存当前会话以便复现。</p><div class="data-options"><label class="data-option upload"><span class="option-icon">↥</span><span><strong>导入 RGB-D 帧</strong><small>包含彩色、深度与内参的 ZIP 数据包</small></span><span>↗</span><input id="frame-file" type="file" accept=".zip"></label><label class="data-option upload"><span class="option-icon">⧉</span><span><strong>恢复会话</strong><small>导入当前设备的标定、选点和测量记录</small></span><span>↗</span><input id="session-file" type="file" accept=".json"></label><a class="data-option" href="/api/exports/session.json" download><span class="option-icon">↧</span><span><strong>保存当前会话</strong><small>导出 JSON，保留测量和标定过程</small></span><span>↗</span></a></div><div class="dialog-divider"><span>学习与演示</span></div><button id="load-demo" class="demo-option"><span class="demo-symbol">◈</span><span><strong>打开示例场景</strong><small>使用合成 RGB-D 体验完整流程</small></span><span class="badge amber">DEMO</span></button><p class="small">示例使用独立会话，并在画面中明确标记。切换数据源会停止当前预览。</p></div></dialog>
+<dialog id="appearance-dialog" class="utility-dialog compact-dialog"><div class="dialog-head"><div><div class="eyebrow">APPEARANCE / MOTION</div><h2>让工作台适合你</h2></div><button class="close-button" data-close aria-label="关闭">×</button></div><div class="dialog-body"><div class="theme-preview"><span></span><div><strong>云白 · Ultramarine</strong><small>云白工作区 · 石墨工具栏 · 群青强调</small></div><i>✓</i></div><label class="preference-row"><span><strong>界面动效</strong><small>页面过渡、操作涟漪与状态反馈</small></span><input id="motion-enabled" type="checkbox" role="switch" checked></label><label class="preference-row"><span><strong>粒子背景</strong><small>随指针轻微流动的蓝色粒子波</small></span><input id="particles-enabled" type="checkbox" role="switch" checked></label><div class="preference-tip"><span class="dot mint"></span><p id="motion-hint">偏好自动保存在这台浏览器中</p></div></div></dialog>
+<dialog id="help-dialog" class="utility-dialog help-dialog"><div class="dialog-head"><div><div class="eyebrow">HELP / GET STARTED</div><h2>从连接到验证</h2></div><button class="close-button" data-close aria-label="关闭">×</button></div><div class="dialog-body"><div class="help-steps"><div><b>01</b><h3>连接与采集</h3><p>使用 USB 3 连接 D435，选择设备并连接。开启实时预览，或采集一帧。</p></div><div><b>02</b><h3>点选与标定</h3><p>点击画面会暂停预览并锁定显示帧。记录同一物理点的实测基座 XYZ，建立对应关系。</p></div><div><b>03</b><h3>独立验证</h3><p>至少 4 个非共线标定点求解变换，再用未参与拟合的新物理点检查误差。</p></div></div><details class="help-detail"><summary>连接遇到问题</summary><p>关闭占用相机的 Viewer，检查 USB 数据线与驱动。终端执行 <code>depthbridge --devices</code> 检测设备。SDK 安装：<code>python -m pip install -e ".[realsense]"</code>。</p></details><details class="help-detail"><summary>坐标、单位与测量</summary><p>相机 X 向右、Y 向下、Z 向前。界面显示 mm，矩阵平移使用 m。深度 Z 是光轴分量；预接近点沿基座 +Z 偏移，运动执行需结合实际机械臂验证。</p></details><details class="help-detail"><summary>保存和恢复工作</summary><p>通过“数据与示例”保存会话。恢复时先连接相同设备，再导入 JSON。完整图像另存 RGB-D 帧；调整相机安装位置后重新标定。</p></details><div class="shortcut-row"><span><kbd>Space</kbd>实时预览 / 暂停</span><span><kbd>C</kbd>采集一帧</span><span><kbd>?</kbd>帮助</span></div><a href="https://github.com/XiaoMa-77/depthbridge-studio" target="_blank" rel="noopener noreferrer">项目文档 ↗</a></div></dialog>
+
 <div id="toast" role="status" aria-live="polite"></div>
 <script type="module" src="/static/app.js"></script>
 </body></html>

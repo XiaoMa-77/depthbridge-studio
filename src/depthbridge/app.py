@@ -23,7 +23,7 @@ class Model(BaseModel):
 
 
 class SourceInput(Model):
-    source: Literal["demo", "realsense"]
+    source: Literal["demo", "realsense", "idle"]
     serial: str = ""
 
 
@@ -32,6 +32,7 @@ class SelectionInput(Model):
     u: int
     v: int
     radius: int = Field(default=2, ge=0, le=8)
+    capture_key: str | None = None
 
 
 class PairInput(Model):
@@ -72,8 +73,8 @@ def download(content: bytes | str, filename: str, media_type: str) -> Response:
                     headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
 
 
-def create_app() -> FastAPI:
-    workspace = Workspace()
+def create_app(initial_source: str = "idle") -> FastAPI:
+    workspace = Workspace(initial_source=initial_source)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -122,7 +123,7 @@ def create_app() -> FastAPI:
     def sources(value: SourceInput):
         with workspace.lock:
             frame = workspace.switch(value.source, value.serial)
-            return {"frame": frame.to_packet(), "state": workspace.state()}
+            return {"frame": frame.to_packet() if frame is not None else None, "state": workspace.state()}
 
     @app.post("/api/frames", status_code=201)
     def frames():

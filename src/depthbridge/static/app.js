@@ -1,9 +1,10 @@
 import {CloudView, multiplyMatrices, transformPoint} from './cloud.js';
+import {effects} from './effects.js';
 
 const $ = id => document.getElementById(id);
 let frame=null,state=null,selected=null,images={},imageMode='color',live=false,liveTimer=null,captureEpoch=0,boardObservation=null;
 const cloud=new CloudView($('cloud-canvas'));
-const titles={workbench:['采集与定位','INSPECT'],calibration:['坐标标定','CALIBRATE'],validation:['误差验证','VALIDATE'],guide:['真机准备','CONNECT']};
+const titles={workbench:['空间测量','INSPECT'],calibration:['坐标标定','CALIBRATE'],validation:['误差验证','VALIDATE']};
 let toastTimer;
 function toast(message,error=false){
   $('toast').textContent=message;$('toast').className=`visible${error?' error':''}`;clearTimeout(toastTimer);
@@ -21,15 +22,30 @@ function fmt(value,digits=2){return Number.isFinite(value)?value.toFixed(digits)
 function xyz(point){return point?point.map(v=>fmt(v*1000,1)).join(', '):'尚未标定';}
 function escapeHtml(text){return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function setTab(name){
+  if(!titles[name])return;
   document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.id===`tab-${name}`));
   document.querySelectorAll('.nav').forEach(e=>e.classList.toggle('active',e.dataset.tab===name));
+  document.querySelectorAll('.nav').forEach(e=>e.setAttribute('aria-current',e.dataset.tab===name?'page':'false'));
   $('page-title').innerHTML=`${titles[name][0]}<span> / ${titles[name][1]}</span>`;
   requestAnimationFrame(()=>cloud.draw());
+  effects.reveal($(`tab-${name}`));
 }
 document.querySelectorAll('[data-tab]').forEach(e=>e.addEventListener('click',()=>setTab(e.dataset.tab)));
-function stopLive(){live=false;clearTimeout(liveTimer);captureEpoch++;$('live-toggle').textContent='实时预览';}
+function stopLive(){live=false;clearTimeout(liveTimer);captureEpoch++;$('live-toggle').textContent='实时预览';updateActivity();}
+function closeDialogs(){document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());}
+document.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>$(button.dataset.open).showModal()));
+document.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',()=>button.closest('dialog').close()));
+document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}}));
+function clearFrame(){
+  frame=null;images={};selected=null;boardObservation=null;
+  $('image-canvas').getContext('2d').clearRect(0,0,$('image-canvas').width,$('image-canvas').height);
+  cloud.frame=null;cloud.points=[];cloud.selection=null;cloud.draw();
+  ['metric-resolution','metric-valid','metric-frame','metric-time','cloud-count'].forEach(id=>$(id).textContent='—');
+  ['download-frame','download-cloud'].forEach(id=>{$(id).setAttribute('aria-disabled','true');$(id).tabIndex=-1;});
+}
 function loadImage(src){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('图像加载失败'));image.src=src;});}
 async function applyPacket(packet,epoch=captureEpoch){
+  if(!packet.frame){clearFrame();setState(packet.state);return;}
   const [color,depth]=await Promise.all([loadImage(packet.frame.color),loadImage(packet.frame.depth)]);
   if(epoch!==captureEpoch)return;
   frame=packet.frame;images={color,depth};boardObservation=null;
@@ -42,9 +58,11 @@ async function applyPacket(packet,epoch=captureEpoch){
   $('cloud-count').textContent=`${frame.points.length.toLocaleString()} points`;
   $('download-frame').href=`/api/frames/${frame.frame_id}/archive`;
   $('download-cloud').href=`/api/frames/${frame.frame_id}/cloud.ply`;
+  ['download-frame','download-cloud'].forEach(id=>{$(id).removeAttribute('aria-disabled');$(id).tabIndex=0;});
   selected=null;
   setState(packet.state);drawImage();
   updateImageModeLabel();
+  effects.flash(document.querySelector('.image-panel'));
 }
 async function capture(){const epoch=captureEpoch;await applyPacket(await api('/api/frames','POST'),epoch);}
 async function liveLoop(){
@@ -63,13 +81,24 @@ function currentBase(){
 function setState(value){
   state=value;const session=state.session;
   if(selected&&!session.selections.some(p=>p.id===selected.id))selected=null;
-  $('source-name').textContent=state.source==='demo'?'离线合成场景':state.source==='realsense'?(frame?.description.split(' · ')[0]||'Intel RealSense'):state.source==='import'?'RGB-D 文件包':'设备已断开';
-  $('source-desc').textContent=state.source==='realsense'?state.source_id.replace('realsense:','序列号 '):state.source==='demo'?'无需相机，先熟悉完整流程':'当前数据独立保存标定配置';
-  $('source-dot').className=`dot ${session.synthetic?'amber':'mint'}`;
-  $('source-banner').className=`source-banner${session.synthetic?'':' real'}`;
-  $('source-banner').querySelector('.badge').className=`badge ${session.synthetic?'amber':'mint'}`;
-  $('source-banner').querySelector('.badge').textContent=session.synthetic?'SYNTHETIC':state.source==='realsense'?'LIVE CAMERA':'RECORDED';
-  $('banner-text').textContent=session.synthetic?'当前是合成场景。坐标与变换用于演示，连接相机后单独标定。':state.source==='realsense'?'真实相机数据。相机固定后采集对应点；移动相机后需要重新标定。':'已导入记录帧。请核对采集来源，并为当前数据加载对应标定。';
+  const connected=state.source==='realsense',idle=['idle','disconnected'].includes(state.source);
+  document.body.dataset.source=state.source;
+  $('source-name').textContent=connected?(frame?.description.split(' · ')[0]||'Intel RealSense D435'):state.source==='demo'?'示例模式':state.source==='import'?'RGB-D 文件回放':'连接深度相机';
+  $('source-desc').textContent=connected?state.source_id.replace('realsense:','SN '):state.source==='demo'?'合成 RGB-D · 独立会话':state.source==='import'?'记录帧 · 独立会话':'Intel RealSense · RGB-D';
+  $('source-dot').className=`dot ${connected?'mint':session.synthetic?'amber':''}`;
+  $('source-status').textContent=connected?'已连接':state.source==='demo'?'示例':state.source==='import'?'回放':'待连接';
+  $('source-status').classList.toggle('connected',connected);
+  $('header-device-name').textContent=connected?'RealSense D435':'连接相机';
+  $('device-launch').classList.toggle('connected',connected);
+  $('device-controls').hidden=connected;$('disconnect-camera').hidden=!connected;
+  $('device-message').textContent=connected?'深度已对齐 RGB · 设备就绪':idle?'选择相机后连接，开始采集真实空间':'可随时连接相机，返回真实测量';
+  if(connected){const serial=state.source_id.replace('realsense:','');if(!Array.from($('device-select').options).some(o=>o.value===serial))$('device-select').add(new Option(`D435 / ${serial}`,serial));$('device-select').value=serial;}
+  $('source-banner').className=`source-banner ${idle?'idle':session.synthetic?'demo':'real'}`;
+  $('source-banner').querySelector('.badge').className=`badge ${session.synthetic?'amber':idle?'':'mint'}`;
+  $('source-banner').querySelector('.badge').textContent=idle?'WAITING':session.synthetic?'SYNTHETIC':connected?'LIVE CAMERA':'RECORDED';
+  $('image-empty').hidden=!!frame;$('cloud-empty').hidden=!!frame;
+  $('capture-frame').disabled=idle;
+  $('source-session-count').textContent=`${session.selections.length} 个测量点`;
   $('live-toggle').disabled=state.source!=='realsense';
   $('metric-transform').textContent=session.extrinsic?session.label:'尚未标定';$('metric-transform').className='long';
   $('metric-direction').textContent=session.mode==='eye_to_hand'?'相机 → 机械臂基座':'相机 → 末端 → 基座';
@@ -96,15 +125,27 @@ function setState(value){
   if(!state.base_from_camera&&$('cloud-coordinates').value==='base')$('cloud-coordinates').value='camera';
   $('cloud-coordinates').querySelector('[value="base"]').disabled=!state.base_from_camera;
   renderSelection();updateCloud();
+  updateActivity();
+}
+function updateActivity(){
+  if(!state)return;
+  const idle=['idle','disconnected'].includes(state.source),connected=state.source==='realsense';
+  document.body.dataset.playback=live?'live':'paused';
+  const label=idle?'等待设备':state.source==='demo'?'示例数据':state.source==='import'?'记录帧回放':live?'实时预览':'测量模式';
+  $('session-state').innerHTML=`<i class="dot ${connected?'mint':state.source==='demo'?'amber':''}"></i>${label}`;
+  $('session-state').classList.toggle('streaming',live);
+  $('banner-text').textContent=idle?'连接深度相机，开始采集真实空间。':state.source==='demo'?'正在查看合成示例，标定与测量记录独立保存。':state.source==='import'?'记录帧已载入，点选画面继续分析。':live?'画面持续更新 · 点击目标冻结当前帧并测量':selected?`已锁定显示帧 #${selected.frame_id} · 坐标基于该帧计算`:'相机就绪 · 开启实时预览，或采集一帧开始测量';
 }
 function renderSelection(){
   const point=selected?.camera_m,base=currentBase();
-  $('selected-label').textContent=selected?`P${state.session.selections.findIndex(p=>p.id===selected.id)+1} / 已选中`:'尚未选择';
+  $('selected-label').textContent=selected?`P${state.session.selections.findIndex(p=>p.id===selected.id)+1} / 已选中`:'选择一个测量点';
   $('selected-pixel').textContent=selected?`像素 (${selected.pixel.join(', ')}) · 帧 #${selected.frame_id}`:'点击 RGB 或深度图';
   ['x','y','z'].forEach((axis,i)=>{$(`camera-${axis}`).textContent=point?fmt(point[i]*1000):'—';$(`base-${axis}`).textContent=base?fmt(base[i]*1000):'—';});
   $('base-hint').textContent=state.base_from_camera?'使用当前变换计算 · 单位 mm':state.session.mode==='eye_in_hand'&&state.session.extrinsic?'请填写当前机器人位姿':'尚未标定，请采集对应点并求解';
   $('depth-spread').textContent=selected?`${fmt(selected.spread_mm)} mm`:'—';$('point-warning').textContent=selected?.warning||'';
   $('use-for-calibration').disabled=!selected;$('use-for-validation').disabled=!selected;
+  $('copy-coordinates').disabled=!selected;
+  $('base-details').open=!!state.base_from_camera;
   $('chain-pixel').textContent=selected?selected.pixel.join(', '):'选择像素';
   $('chain-depth').textContent=selected?fmt(selected.depth_m*1000):'—';$('chain-camera').textContent=point?xyz(point):'—';$('chain-base').textContent=base?xyz(base):'尚未标定';
   $('pair-selected').textContent=selected?`像素 (${selected.pixel.join(', ')}) · 相机 XYZ: [${xyz(point)}] mm`:'请先在“采集与定位”中选点';
@@ -120,11 +161,11 @@ function drawImage(){
   ctx.drawImage(imageMode==='depth'?images.depth:images.color,0,0);
   if(imageMode==='overlay'){ctx.globalAlpha=.45;ctx.drawImage(images.depth,0,0);ctx.globalAlpha=1;}
   for(const p of state?.session.selections||[]){
-    if(p.frame_id!==frame.frame_id)continue;const [x,y]=p.pixel;
-    ctx.beginPath();ctx.arc(x,y,selected?.id===p.id?7:4,0,Math.PI*2);ctx.strokeStyle=selected?.id===p.id?'#b5ffe7':'#e0b777';ctx.lineWidth=2;ctx.stroke();
+    if(p.frame_id!==frame.frame_id||p.capture_key!==frame.capture_key)continue;const [x,y]=p.pixel;
+    ctx.beginPath();ctx.arc(x,y,selected?.id===p.id?7:4,0,Math.PI*2);ctx.strokeStyle=selected?.id===p.id?'#dce6ff':'#e0b777';ctx.lineWidth=2;ctx.stroke();
     ctx.beginPath();ctx.moveTo(x-12,y);ctx.lineTo(x+12,y);ctx.moveTo(x,y-12);ctx.lineTo(x,y+12);ctx.stroke();
   }
-  if(boardObservation?.frame_id===frame.frame_id){ctx.fillStyle='#92ffe0';for(const [x,y] of boardObservation.corners){ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fill();}}
+  if(boardObservation?.frame_id===frame.frame_id){ctx.fillStyle='#94b5ff';for(const [x,y] of boardObservation.corners){ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fill();}}
 }
 function updateImageModeLabel(){
   const range=frame?.depth_range_m;
@@ -140,24 +181,27 @@ $('image-canvas').addEventListener('click',run(async e=>{
   // The canvas has the same aspect ratio as the source; no CSS object-fit crop.
   const u=Math.min(frame.width-1,Math.max(0,Math.floor((e.clientX-rect.left)/rect.width*frame.width)));
   const v=Math.min(frame.height-1,Math.max(0,Math.floor((e.clientY-rect.top)/rect.height*frame.height)));
-  const result=await api('/api/selections','POST',{frame_id:frame.frame_id,u,v,radius:Number($('sample-radius').value)});
+  const result=await api('/api/selections','POST',{frame_id:frame.frame_id,capture_key:frame.capture_key,u,v,radius:Number($('sample-radius').value)});
   selected=result.selection;setState(result.state);drawImage();
 }));
-$('capture-frame').onclick=run(async()=>{stopLive();await capture();});
-$('live-toggle').onclick=()=>{if(live){stopLive();return;}live=true;$('live-toggle').textContent='暂停预览';liveLoop();};
-$('load-demo').onclick=run(async()=>{stopLive();await applyPacket(await api('/api/sources','POST',{source:'demo'}));toast('已切回离线示例');});
-$('detect-devices').onclick=run(async()=>{
+$('capture-frame').onclick=run(async()=>{stopLive();$('capture-frame').setAttribute('aria-busy','true');try{await capture();}finally{$('capture-frame').removeAttribute('aria-busy');}});
+$('live-toggle').onclick=()=>{if(live){stopLive();return;}live=true;$('live-toggle').textContent='暂停预览';updateActivity();liveLoop();};
+$('load-demo').onclick=run(async()=>{stopLive();await applyPacket(await api('/api/sources','POST',{source:'demo'}));closeDialogs();cloud.reset();toast('已打开示例场景，数据独立保存');});
+async function refreshDevices(announce=true){
   const result=await api('/api/devices');$('device-message').textContent=result.message;
-  $('device-select').innerHTML='<option value="">自动选择已连接设备</option>';
+  $('device-select').innerHTML='<option value="">'+(result.devices.length?'选择已连接的设备':'未发现设备')+'</option>';
   for(const d of result.devices){const option=new Option(`${d.name} / ${d.serial}`,d.serial);$('device-select').add(option);}
-  toast(result.devices.length?`发现 ${result.devices.length} 台设备`:result.message,!result.devices.length);
-});
+  if(result.devices.length===1)$('device-select').value=result.devices[0].serial;
+  if(announce)toast(result.devices.length?`发现 ${result.devices.length} 台设备`:result.message,!result.devices.length);
+}
+$('detect-devices').onclick=run(()=>refreshDevices());
 $('connect-camera').onclick=run(async()=>{
-  stopLive();$('connect-camera').disabled=true;
-  try{await applyPacket(await api('/api/sources','POST',{source:'realsense',serial:$('device-select').value}));toast('相机已连接，请检查 RGB 与深度，再采集标定点');cloud.reset();}
+  stopLive();$('connect-camera').disabled=true;$('connect-camera').setAttribute('aria-busy','true');$('source-status').textContent='连接中';
+  try{await applyPacket(await api('/api/sources','POST',{source:'realsense',serial:$('device-select').value}));closeDialogs();toast('相机已连接，可以开始采集与测量');cloud.reset();}
   catch(error){setState(await api('/api/status'));throw error;}
-  finally{$('connect-camera').disabled=false;}
+  finally{$('connect-camera').disabled=false;$('connect-camera').removeAttribute('aria-busy');}
 });
+$('disconnect-camera').onclick=run(async()=>{stopLive();await applyPacket(await api('/api/sources','POST',{source:'idle'}));toast('相机已断开，本次设备会话仍保留');await refreshDevices(false);});
 function choosePair(role){if(!selected)return;$('pair-role').value=role;setTab('calibration');$('measured-x').focus();}
 $('use-for-calibration').onclick=()=>choosePair('calibration');$('use-for-validation').onclick=()=>choosePair('validation');
 $('pair-form').onsubmit=run(async e=>{
@@ -186,10 +230,10 @@ $('save-preview').onclick=run(async()=>{
 $('cloud-coordinates').onchange=()=>{updateCloud();cloud.reset();};$('reset-view').onclick=()=>cloud.reset();
 $('frame-file').onchange=run(async e=>{
   const file=e.target.files[0];if(!file)return;stopLive();
-  try{const response=await fetch('/api/frames/import',{method:'POST',headers:{'Content-Type':'application/zip'},body:file});const result=await response.json();if(!response.ok)throw new Error(result.detail);await applyPacket(result);toast('RGB-D 文件已导入，当前数据使用独立标定配置');cloud.reset();}
+  try{const response=await fetch('/api/frames/import',{method:'POST',headers:{'Content-Type':'application/zip'},body:file});const result=await response.json();if(!response.ok)throw new Error(result.detail);await applyPacket(result);closeDialogs();toast('RGB-D 文件已导入，当前数据使用独立标定配置');cloud.reset();}
   finally{e.target.value='';}
 });
-async function readJsonInput(event,endpoint,method){const file=event.target.files[0];if(!file)return;try{setState(await api(endpoint,method,JSON.parse(await file.text())));toast('导入成功');}finally{event.target.value='';}}
+async function readJsonInput(event,endpoint,method){const file=event.target.files[0];if(!file)return;try{setState(await api(endpoint,method,JSON.parse(await file.text())));closeDialogs();toast('导入成功');}finally{event.target.value='';}}
 $('session-file').onchange=run(e=>readJsonInput(e,'/api/session','PUT'));
 $('calibration-file').onchange=run(e=>readJsonInput(e,'/api/calibrations/import','POST'));
 $('detect-board').onclick=run(async()=>{
@@ -203,4 +247,15 @@ $('add-observation').onclick=run(async()=>{
 });
 $('solve-handeye').onclick=run(async()=>{const result=await api('/api/calibrations','POST',{method:'handeye'});setState(result.state);toast('手眼求解完成，请使用新数据验证');});
 window.addEventListener('beforeunload',e=>{if(state?.session.pairs.length||state?.session.observations.length){e.preventDefault();e.returnValue='';}});
-await run(async()=>{await capture();}) ();
+$('copy-coordinates').onclick=run(async()=>{if(!selected)return;const text=`X=${fmt(selected.camera_m[0]*1000)} mm, Y=${fmt(selected.camera_m[1]*1000)} mm, Z=${fmt(selected.camera_m[2]*1000)} mm`;await navigator.clipboard.writeText(text);toast('相机 XYZ 已复制（mm）');});
+$('image-canvas').addEventListener('mousemove',event=>{if(!frame)return;const r=event.currentTarget.getBoundingClientRect();const u=Math.floor((event.clientX-r.left)/r.width*frame.width),v=Math.floor((event.clientY-r.top)/r.height*frame.height);$('hover-pixel').textContent=`u ${Math.max(0,Math.min(frame.width-1,u))} · v ${Math.max(0,Math.min(frame.height-1,v))}`;},{passive:true});
+$('image-canvas').addEventListener('mouseleave',()=>{$('hover-pixel').textContent='点击选点 ⊕';});
+document.addEventListener('keydown',event=>{
+  if(event.ctrlKey||event.metaKey||event.altKey||event.target.closest('input,textarea,select,button,a,summary,[contenteditable="true"]')||document.querySelector('dialog[open]'))return;
+  if(event.key==='?'){$('help-dialog').showModal();return;}
+  if(event.code==='Space'&&state?.source==='realsense'){event.preventDefault();$('live-toggle').click();}
+  if(event.key.toLowerCase()==='c'&&!$('capture-frame').disabled)$('capture-frame').click();
+});
+await run(async()=>{const initial=await api('/api/status');if(['idle','disconnected'].includes(initial.source)){clearFrame();setState(initial);await refreshDevices(false);}else{await capture();}effects.reveal(document.querySelector('main'));}) ();
+
+document.getElementById('cloud-palette').addEventListener('change',event=>{cloud.palette=event.target.value;cloud.draw();});

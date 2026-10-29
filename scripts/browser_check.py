@@ -24,9 +24,21 @@ def main():
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(args.url)
         page.wait_for_load_state("networkidle")
+        page.evaluate('document.fonts.ready')
+        assert page.evaluate("document.fonts.check('14px DBSans') && document.fonts.check('28px DBMono')")
+        assert page.locator('#page-title').evaluate('e=>parseFloat(getComputedStyle(e).fontSize)') >= 44
+        expect(page.locator('.nav')).to_have_count(3)
+        expect(page.locator('#image-empty')).to_be_visible()
+        expect(page.locator('#metric-resolution')).to_have_text('—')
+        expect(page.locator('#capture-frame')).to_be_disabled()
+        expect(page.locator('#load-demo')).not_to_be_visible()
+        page.locator('.sidebar-tools [data-open="data-dialog"]').click()
+        page.locator('#load-demo').click()
         expect(page.locator("#metric-resolution")).to_have_text("640 × 480")
         expect(page.locator("#source-banner")).to_contain_text("SYNTHETIC")
+        page.locator(".sampling-settings summary").click()
         page.locator("#sample-radius").select_option("0")
+        page.locator(".sampling-settings summary").click()
 
         def select(u, v):
             page.locator('[data-tab="workbench"]').click()
@@ -48,6 +60,13 @@ def main():
             page.locator(f'[data-image="{mode}"]').click()
         page.locator("#cloud-coordinates").select_option("base")
         page.locator("#reset-view").click()
+        cold_cloud = page.locator('#cloud-canvas').evaluate('c=>c.toDataURL()')
+        page.locator('#cloud-palette').select_option('rgb')
+        assert page.locator('#cloud-canvas').evaluate('c=>c.toDataURL()') != cold_cloud
+        page.locator('#cloud-palette').select_option('ice')
+        page.locator('#base-details').evaluate('e=>e.open=false')
+        page.locator('#toast').evaluate('e=>e.className=""')
+        page.evaluate('window.scrollTo(0,0)')
         page.screenshot(path=str(output / "workbench.png"), full_page=True)
         checks.append("RGB/depth/overlay, exact pixel selection, linked base cloud")
 
@@ -68,10 +87,14 @@ def main():
             assert response.value.status == 201
         page.locator("#solve-points").click()
         expect(page.locator("#fit-rms")).to_contain_text("0.000")
+        expect(page.locator('#toast')).to_contain_text('标定求解完成')
+        page.locator('#toast').evaluate('e=>e.className=""')
+        page.evaluate('window.scrollTo(0,0)')
         page.screenshot(path=str(output / "calibration.png"), full_page=True)
         page.locator('[data-tab="validation"]').click()
         expect(page.locator("#validation-count")).to_have_text("1")
         expect(page.locator("#validation-rms")).to_have_text("3.000")
+        page.evaluate('window.scrollTo(0,0)')
         page.screenshot(path=str(output / "validation.png"), full_page=True)
         checks.append("5-point fit and held-out validation show independent 3 mm error")
 
@@ -86,23 +109,62 @@ def main():
             select(200, 200)
             overflow = page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
             assert overflow <= 2, f"Horizontal overflow at {width}: {overflow}"
+            page.evaluate('window.scrollTo(0,0)')
             page.screenshot(path=str(output / f"responsive-{width}.png"), full_page=True)
         checks.append("1280px, 900px and 390px responsive layout and pixel coordinates")
 
         page.set_viewport_size({"width": 1600, "height": 1050})
-        archive = page.request.get(args.url + "/api/frames/2/archive")
+        latest_frame = page.request.get(args.url + "/api/status").json()["frame_id"]
+        archive = page.request.get(args.url + f"/api/frames/{latest_frame}/archive")
         assert archive.status == 200
         with page.expect_response(lambda response: response.url.endswith("/api/frames/import")) as response:
             page.locator("#frame-file").set_input_files({"name": "demo.zip", "mimeType": "application/zip", "buffer": archive.body()})
         assert response.value.status == 201
-        expect(page.locator("#source-name")).to_have_text("RGB-D 文件包")
+        expect(page.locator("#source-name")).to_have_text("RGB-D 文件回放")
         expect(page.locator("#metric-transform")).to_have_text("尚未标定")
+        page.locator('.sidebar-tools [data-open="data-dialog"]').click()
         page.locator("#load-demo").click()
-        expect(page.locator("#source-name")).to_have_text("离线合成场景")
+        expect(page.locator("#source-name")).to_have_text("示例模式")
         checks.append("RGB-D import isolation and source switching")
-        page.locator('[data-tab="guide"]').click()
-        expect(page.get_by_role("heading", name="明天：连接固定支架上的 D435")).to_be_visible()
-        checks.append("D435 checklist")
+        page.locator('.sidebar-tools [data-open="help-dialog"]').click()
+        expect(page.get_by_role("heading", name="从连接到验证")).to_be_visible()
+        page.keyboard.press('Escape')
+        expect(page.locator('#help-dialog')).not_to_be_visible()
+        checks.append("Three-step navigation, explicit examples and contextual help")
+
+        page.locator('.sidebar-tools [data-open="appearance-dialog"]').click()
+        page.locator('#motion-enabled').uncheck()
+        assert page.evaluate('document.documentElement.dataset.motion') == 'off'
+        expect(page.locator('#particles-enabled')).to_be_disabled()
+        page.keyboard.press('Escape')
+        page.on('dialog', lambda dialog: dialog.accept())
+        page.reload()
+        page.wait_for_load_state('networkidle')
+        assert page.evaluate('document.documentElement.dataset.motion') == 'off'
+        page.locator('.sidebar-tools [data-open="appearance-dialog"]').click()
+        page.locator('#motion-enabled').check()
+        page.locator('#particles-enabled').uncheck()
+        assert page.evaluate('document.documentElement.dataset.particles') == 'off'
+        page.locator('#particles-enabled').check()
+        assert page.evaluate('document.documentElement.dataset.particles') == 'on'
+        page.keyboard.press('Escape')
+        particle_frame = page.locator('#ambient-particles').evaluate('c=>c.toDataURL()')
+        page.wait_for_function("old=>document.getElementById('ambient-particles').toDataURL()!==old", arg=particle_frame)
+        assert page.locator('#ambient-particles').evaluate('c=>getComputedStyle(c).pointerEvents') == 'none'
+        select(200, 200)
+        page.context.grant_permissions(['clipboard-read','clipboard-write'])
+        page.locator('#copy-coordinates').click()
+        assert 'mm' in page.evaluate('navigator.clipboard.readText()')
+        checks.append('Animated particle canvas, motion controls, persisted preference, offline fonts and coordinate copying')
+
+        reduced_context = browser.new_context(reduced_motion='reduce', viewport={'width':1280,'height':900})
+        reduced_page = reduced_context.new_page()
+        reduced_page.goto(args.url)
+        reduced_page.wait_for_load_state('networkidle')
+        assert reduced_page.evaluate('document.documentElement.dataset.motion') == 'off'
+        assert reduced_page.evaluate('document.documentElement.dataset.particles') == 'off'
+        reduced_context.close()
+        checks.append('System reduced-motion preference respected')
         page.on("dialog", lambda dialog: dialog.accept())
         browser.close()
     assert not errors, errors

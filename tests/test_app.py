@@ -11,7 +11,7 @@ from depthbridge.geometry import apply_transform
 
 @pytest.fixture
 def client():
-    with TestClient(create_app()) as result:
+    with TestClient(create_app(initial_source="demo")) as result:
         yield result
 
 
@@ -89,3 +89,41 @@ def test_malformed_and_misregistered_archive_errors(client):
     assert client.post("/api/pairs", json={"selection_id": "missing", "base_mm": [0, 0, 0]}).status_code == 422
     response = client.get("/api/exports/session.json")
     assert json.loads(response.content)["schema"] == "depthbridge-session-v1"
+
+
+def test_production_startup_waits_for_camera_without_synthetic_data():
+    with TestClient(create_app()) as api:
+        state = api.get("/api/status").json()
+        assert state["source"] == "idle"
+        assert state["frame_id"] is None
+        assert state["session"]["synthetic"] is False
+        assert state["base_from_camera"] is None
+        assert api.post("/api/frames").status_code == 422
+        response = api.post("/api/sources", json={"source": "demo"})
+        assert response.status_code == 201
+        assert response.json()["frame"]["source"] == "demo"
+
+
+def test_disconnect_is_idle_and_preserves_the_explicit_demo_session(client):
+    point = client.post("/api/selections", json={"frame_id": 1, "u": 200, "v": 200}).json()["selection"]
+    response = client.post("/api/sources", json={"source": "idle"})
+    assert response.status_code == 201
+    assert response.json()["frame"] is None
+    assert response.json()["state"]["base_from_camera"] is None
+    assert response.json()["state"]["session"]["synthetic"] is False
+    assert client.post("/api/frames").status_code == 422
+    assert client.post("/api/selections", json={"frame_id": 1, "u": 200, "v": 200}).status_code == 409
+    restored = client.post("/api/sources", json={"source": "demo"}).json()
+    assert restored["state"]["session"]["selections"][0]["id"] == point["id"]
+
+
+def test_previous_run_frame_identity_is_rejected():
+    with TestClient(create_app(initial_source="demo")) as old, TestClient(create_app(initial_source="demo")) as new:
+        previous = old.post("/api/frames").json()["frame"]
+        current = new.post("/api/frames").json()["frame"]
+        assert previous["frame_id"] == current["frame_id"]
+        assert previous["capture_key"] != current["capture_key"]
+        request = {"frame_id": current["frame_id"], "capture_key": previous["capture_key"], "u": 200, "v": 200}
+        assert new.post("/api/selections", json=request).status_code == 409
+        request["capture_key"] = current["capture_key"]
+        assert new.post("/api/selections", json=request).status_code == 201
