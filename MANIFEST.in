@@ -1,0 +1,10 @@
+include README.md LICENSE CHANGELOG.md constraints-py312.txt main.py setup.ps1 start.ps1
+recursive-include src/depthbridge/static *.html *.css *.js
+recursive-include docs *.md *.png
+recursive-include scripts *.py
+recursive-include tests *.py
+prune .venv
+prune .planning
+prune qa-output
+prune data
+global-exclude __pycache__ *.py[cod]

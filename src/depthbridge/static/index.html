@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark"><title>DepthBridge Studio · RGB-D 标定工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121c25'/%3E%3Cpath d='M7 23V9h9v14h9V9' fill='none' stroke='%2369ddc0' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="/"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 27V9h12v18h12V9"/></svg><span>DepthBridge<small>STUDIO / 0.1</small></span></a>
+  <div class="nav-label">工作空间 <span>WORKSPACE</span></div>
+  <nav aria-label="工作空间">
+    <button class="nav active" data-tab="workbench"><span>⌖</span>采集与定位<i>01</i></button>
+    <button class="nav" data-tab="calibration"><span>⌘</span>坐标标定<i>02</i></button>
+    <button class="nav" data-tab="validation"><span>▥</span>误差验证<i>03</i></button>
+    <button class="nav" data-tab="guide"><span>↗</span>真机准备<i>04</i></button>
+  </nav>
+  <div class="source-card">
+    <div class="card-eyebrow">数据源 <span id="source-dot" class="dot amber"></span></div>
+    <strong id="source-name">离线合成场景</strong><p id="source-desc">无需相机，先熟悉完整流程</p>
+    <label for="device-select">RealSense 设备</label>
+    <select id="device-select"><option value="">自动选择已连接设备</option></select>
+    <div class="button-row"><button id="detect-devices" class="button subtle">检测设备</button><button id="connect-camera" class="button primary">连接 D435</button></div>
+    <p id="device-message" class="small">优先使用 USB 3 数据线</p>
+    <button id="load-demo" class="button full subtle">切回离线示例</button>
+  </div>
+  <div class="sidebar-footer"><span class="dot mint"></span>本地处理 · 无外部推理服务<br><span>相机 → 坐标 → 验证</span></div>
+</aside>
+<main>
+  <header class="topbar"><div><div class="eyebrow">RGB-D CALIBRATION WORKBENCH</div><h1 id="page-title">采集与定位<span> / INSPECT</span></h1></div>
+    <div class="header-actions"><label class="button subtle upload">导入 RGB-D<input id="frame-file" type="file" accept=".zip"></label><a class="button subtle" href="/api/exports/session.json" download>导出会话 ↗</a></div>
+  </header>
+  <div id="source-banner" class="source-banner"><span class="badge amber">SYNTHETIC</span><span id="banner-text">当前是合成场景。坐标与变换用于演示，连接相机后单独标定。</span></div>
+
+  <section id="tab-workbench" class="tab active">
+    <div class="workspace-heading"><div><h2>从像素到三维位置</h2><p>点选左侧图像，联动检查深度、点云与基座坐标。</p></div><div class="button-row"><button id="live-toggle" class="button subtle" disabled>实时预览</button><button id="capture-frame" class="button primary">↻ 采集一帧</button></div></div>
+    <div class="metrics"><div><span>图像尺寸</span><strong id="metric-resolution">—</strong><small>彩色 / 深度已对齐</small></div><div><span>有效深度占比</span><strong id="metric-valid">—</strong><small>当前画面</small></div><div><span>坐标变换</span><strong id="metric-transform">示例变换</strong><small id="metric-direction">相机 → 机械臂基座</small></div><div><span>当前帧</span><strong id="metric-frame">—</strong><small id="metric-time">等待采集</small></div></div>
+    <div class="inspect-layout">
+      <div class="visual-area">
+        <div class="views">
+          <article class="panel image-panel"><div class="panel-head"><span><b class="tiny-square"></b>RGB-D 视图</span><div class="segmented"><button class="active" data-image="color">RGB</button><button data-image="depth">深度</button><button data-image="overlay">叠加</button></div></div>
+            <div class="image-stage"><canvas id="image-canvas" width="640" height="480" aria-label="RGB-D 图像，点击选择测量点" role="img"></canvas><div class="image-caption"><span id="image-mode">RGB / COLOR</span><span>点击图像选点 ⊕</span></div></div>
+            <div class="panel-foot"><span><i class="dot mint"></i>深度对齐到 RGB</span><span id="frame-source-label">合成数据</span></div>
+          </article>
+          <article class="panel cloud-panel"><div class="panel-head"><span><b class="tiny-square mint-bg"></b>三维坐标预览</span><div class="button-row"><select id="cloud-coordinates" aria-label="点云坐标系"><option value="camera">相机坐标</option><option value="base">基座坐标</option></select><button class="icon-button" id="reset-view" title="复位视角">⤢</button></div></div>
+            <div class="cloud-stage"><canvas id="cloud-canvas" aria-label="可旋转三维点云" role="img"></canvas><div class="cloud-hint">拖动旋转 · 滚轮缩放 · 双击复位</div><div id="cloud-label" class="cloud-label">CAMERA OPTICAL FRAME</div></div>
+            <div class="panel-foot"><span><i class="axis red"></i>X <i class="axis green"></i>Y <i class="axis blue"></i>Z</span><span id="cloud-count">— points</span></div>
+          </article>
+        </div>
+        <article class="panel chain-panel"><div class="panel-head"><span>坐标转换链</span><span class="muted">长度单位：mm</span></div><div class="coordinate-chain"><div><small>01 / IMAGE</small><strong id="chain-pixel">选择像素</strong><span>像素 (u, v)</span></div><b>→</b><div><small>02 / DEPTH</small><strong id="chain-depth">—</strong><span>光轴深度 Z</span></div><b>→</b><div><small>03 / CAMERA</small><strong id="chain-camera">—</strong><span>相机光学坐标</span></div><b>→</b><div><small>04 / BASE</small><strong id="chain-base">—</strong><span>机械臂基座坐标</span></div></div></article>
+        <article class="panel recent-panel"><div class="panel-head"><span>最近选点</span><span class="muted">保留采集时的坐标快照</span></div><div class="table-scroll"><table><thead><tr><th>点位</th><th>像素</th><th>深度 / mm</th><th>相机 XYZ / mm</th><th>基座 XYZ / mm</th></tr></thead><tbody id="recent-points"><tr><td colspan="5" class="empty">点击图像开始测量</td></tr></tbody></table></div></article>
+      </div>
+      <aside class="selection-panel panel"><div class="panel-head"><span>测量详情</span><span class="badge mint">POINT</span></div><div class="selection-body"><div class="point-title"><span id="selected-label">尚未选择</span><small id="selected-pixel">点击 RGB 或深度图</small></div>
+        <label for="sample-radius">深度采样半径</label><select id="sample-radius"><option value="0">单像素 · 边缘或精确定位</option><option value="1">1 px · 3 × 3 邻域中值</option><option value="2" selected>2 px · 5 × 5 邻域中值</option><option value="3">3 px · 7 × 7 邻域中值</option></select>
+        <div class="detail-group"><h3>相机坐标 <span>CAMERA / mm</span></h3><dl class="xyz"><div><dt class="x">X</dt><dd id="camera-x">—</dd></div><div><dt class="y">Y</dt><dd id="camera-y">—</dd></div><div><dt class="z">Z</dt><dd id="camera-z">—</dd></div></dl></div>
+        <div class="detail-group"><h3>基座坐标 <span>BASE / mm</span></h3><dl class="xyz"><div><dt class="x">X</dt><dd id="base-x">—</dd></div><div><dt class="y">Y</dt><dd id="base-y">—</dd></div><div><dt class="z">Z</dt><dd id="base-z">—</dd></div></dl><p id="base-hint" class="small">使用当前坐标变换重新计算</p></div>
+        <div class="quality-row"><span>邻域深度跨度 P90−P10</span><b id="depth-spread">—</b></div><p id="point-warning" class="warning-text"></p>
+        <button id="use-for-calibration" class="button primary full" disabled>＋ 记录为标定点</button><button id="use-for-validation" class="button subtle full" disabled>记录为独立验证点</button>
+        <details class="preview-settings"><summary>预接近位置预览</summary><p class="small">以基座 +Z 为接近方向。仅预览表面点与高度偏移。</p><label>预接近高度 / mm<input id="clearance" type="number" min="0" max="1000" value="80"></label><label>表面 Z 偏移 / mm<input id="surface-offset" type="number" min="-500" max="500" value="0"></label><button id="save-preview" class="button subtle full">更新预览设置</button></details>
+        <div class="download-row"><a id="download-frame" href="#">保存 RGB-D 帧 ↗</a><a id="download-cloud" href="#">导出 PLY ↗</a></div>
+      </div></aside>
+    </div>
+  </section>
+
+  <section id="tab-calibration" class="tab">
+    <div class="workspace-heading"><div><h2>建立相机与机械臂的空间关系</h2><p>固定 D435 优先使用三维对应点标定；坐标以机械臂实际基座和已标定 TCP 为准。</p></div><a href="/api/exports/calibration.json" class="button subtle" download>导出标定 ↗</a></div>
+    <div class="calibration-grid">
+      <article class="panel"><div class="panel-head"><span>添加三维对应点</span><span class="badge mint">FIXED CAMERA</span></div><div class="panel-body"><div class="step-note"><b>1</b><p>相机和目标保持静止，在图像中点选清晰的物理特征点。</p></div><div class="step-note"><b>2</b><p>用已标定的 TCP 测量同一个物理点，填入基座坐标。标定点分散在工作区；另留新点验证。</p></div><div id="pair-selected" class="selected-reference">请先在“采集与定位”中选点</div><form id="pair-form"><div class="input-triple"><label>基座 X / mm<input id="measured-x" type="number" step="any" required></label><label>基座 Y / mm<input id="measured-y" type="number" step="any" required></label><label>基座 Z / mm<input id="measured-z" type="number" step="any" required></label></div><div class="input-double"><label>点用途<select id="pair-role"><option value="calibration">参与标定</option><option value="validation">独立验证 · 不参与求解</option></select></label><label>标签<input id="pair-label" placeholder="如：左前角 / P01" maxlength="100"></label></div><button class="button primary full" type="submit">添加对应点</button></form><button id="fill-demo-pair" class="button subtle full demo-only">用示例真值填写（仅合成数据）</button></div></article>
+      <article class="panel"><div class="panel-head"><span>当前标定配置</span><span id="transform-label" class="muted">—</span></div><div class="panel-body"><label>安装方式<select id="mount-mode"><option value="eye_to_hand">固定在支架上 · Eye-to-hand</option><option value="eye_in_hand">安装在末端 · Eye-in-hand</option></select></label><p id="matrix-direction" class="small">T_base_from_camera · 列向量 · 平移单位 m</p><label>4 × 4 变换矩阵<textarea id="transform-matrix" rows="5" spellcheck="false" placeholder="尚未标定；先采集对应点求解，或粘贴已知矩阵"></textarea></label><div id="robot-pose-wrap" hidden><label>T_base_from_tool / m<textarea id="robot-pose" rows="5" spellcheck="false" placeholder="末端相机模式需填写拍摄时的机器人位姿"></textarea></label></div><div class="button-row"><button id="apply-transform" class="button subtle">应用手动矩阵</button><label class="button subtle upload">导入标定<input id="calibration-file" type="file" accept=".json"></label></div><div class="solve-summary"><span>求解残差 <small>仅参与求解的点</small></span><strong id="fit-rms">— <small>mm</small></strong></div><button id="solve-points" class="button primary full">求解固定相机变换</button><p class="small">至少 4 个非共线点，推荐 8–12 个。尽量覆盖不同位置与高度。求解残差与独立验证误差分别显示。</p></div></article>
+    </div>
+    <article class="panel"><div class="panel-head"><span>对应点数据集</span><a href="/api/exports/measurements.csv" download>导出 CSV ↗</a></div><div class="table-scroll"><table><thead><tr><th>标签</th><th>用途</th><th>像素</th><th>相机 XYZ / mm</th><th>实测基座 XYZ / mm</th><th>当前误差 / mm</th><th></th></tr></thead><tbody id="pairs-table"><tr><td colspan="7" class="empty">尚无对应点</td></tr></tbody></table></div></article>
+    <details class="panel handeye-panel"><summary>进阶：棋盘格与手眼标定 <span>支持固定与末端相机</span></summary><div class="panel-body"><p class="small">固定相机时将标定板刚性安装在末端；末端相机时将板固定在工作区。每次静止后采图并填写同一时刻的机器人矩阵。使用不对称内角点布局并保持角点原点一致。</p><div class="input-triple"><label>内角点列数<input id="board-columns" type="number" value="9" min="3" max="20"></label><label>内角点行数<input id="board-rows" type="number" value="6" min="3" max="20"></label><label>实际方格边长 / mm<input id="board-square" type="number" value="20" min="1" max="200"></label></div><button id="detect-board" class="button subtle">检测当前帧棋盘格</button><span id="board-result" class="small"></span><div class="input-double"><label>机器人 T_base_from_tool / m<textarea id="observation-robot" rows="5" spellcheck="false" placeholder="[[1,0,0,0], ...]；旋转必须为矩阵，平移为米"></textarea></label><label>检测所得 T_camera_from_target / m<textarea id="observation-board" rows="5" spellcheck="false"></textarea></label></div><div class="button-row"><button id="add-observation" class="button subtle">记录这组观测</button><button id="solve-handeye" class="button primary">求解手眼变换</button><span id="observation-count" class="small">0 组观测</span></div><div id="observations-list" class="observation-list"></div></div></details>
+  </section>
+
+  <section id="tab-validation" class="tab">
+    <div class="workspace-heading"><div><h2>用新点验证真实定位误差</h2><p>验证点应是未参与求解的物理点。先固定相机完成标定，再测试工作区各处。</p></div><a class="button subtle" href="/api/exports/measurements.csv" download>导出验证数据 ↗</a></div>
+    <div class="metrics validation-metrics"><div><span>参与标定的点</span><strong id="calibration-count">0</strong><small>用于计算变换</small></div><div><span>独立验证点</span><strong id="validation-count">0</strong><small>不参与计算变换</small></div><div><span>验证 RMS</span><strong id="validation-rms">—</strong><small>三维欧氏误差 / mm</small></div><div><span>验证最大误差</span><strong id="validation-max">—</strong><small>当前验证点集 / mm</small></div></div>
+    <article class="panel"><div class="panel-head"><span>逐点三维误差</span><span><i class="dot mint"></i>标定点 <i class="dot amber"></i>验证点</span></div><div id="error-chart" class="error-chart"><p class="empty">添加对应点并完成标定后查看误差</p></div></article>
+    <article class="panel"><div class="panel-body"><h3>结果怎么判断</h3><p>先看误差是否满足你的夹爪、目标尺寸和任务要求，再检查工作区边缘与不同高度。这里显示的是记录点的定位误差，完整抓取还受 TCP、夹持位置、运动与目标形状影响。</p><p class="small">可视化预接近点沿基座 +Z 偏移，没有进行机械臂逆解、碰撞检测或动作执行。</p></div></article>
+  </section>
+
+  <section id="tab-guide" class="tab">
+    <div class="workspace-heading"><div><h2>明天：连接固定支架上的 D435</h2><p>先确认数据，再求解坐标关系，最后做独立验证。</p></div><span class="badge mint">INTEL REALSENSE D435</span></div>
+    <div class="guide-grid"><article class="panel"><div class="panel-head">连接前</div><div class="panel-body"><ol><li>将 D435 固定，测试期间保持位置与角度不变。</li><li>使用 USB 3 数据线，关闭 RealSense Viewer 等占用相机的程序。</li><li>项目虚拟环境安装 RealSense 扩展：<code>python -m pip install -e ".[realsense]"</code></li><li>点击左侧“检测设备”，选择序列号，然后“连接 D435”。</li></ol><a href="https://github.com/realsenseai/librealsense" target="_blank" rel="noopener noreferrer">RealSense 官方 SDK ↗</a></div></article><article class="panel"><div class="panel-head">开始测量</div><div class="panel-body"><ol><li>检查 RGB、深度和叠加视图，确认物体边缘对应。</li><li>在哑光平面上选点，检查深度是否合理。物体边缘用单像素采样。</li><li>相机和目标静止时，采集至少 4 组同名点，推荐 8–12 组。</li><li>填入已标定 TCP 测得的同一点基座坐标，单位 mm。</li><li>求解后留出新的物理点，记录为“独立验证”。</li><li>导出会话、标定、CSV 和必要的 RGB-D 帧。</li></ol></div></article></div>
+    <article class="panel"><div class="panel-head">排查提示</div><div class="panel-body troubleshooting"><div><h3>检测不到相机</h3><p>检查 USB、驱动和进程占用。终端运行 <code>depthbridge --devices</code> 获取检测结果。</p></div><div><h3>深度缺失或跳动</h3><p>检查距离、反光、透明材质和照明；先用普通纸面确认，再测目标物体。</p></div><div><h3>坐标明显错位</h3><p>核对基座/工具坐标系、mm 与 m、矩阵方向，以及相机是否被移动。</p></div><div><h3>保存与恢复</h3><p>退出前导出会话；恢复时先连接同一序列号设备，再导入会话。改变安装位置后重新标定。</p></div></div></article>
+    <article class="panel"><div class="panel-head">会话文件</div><div class="panel-body"><p>会话包含选点、对应点、变换及观测数据。完整图像请另外保存 RGB-D 帧。当前工作空间在进程内保留，退出前导出。</p><label class="button subtle upload">导入会话 JSON<input id="session-file" type="file" accept=".json"></label></div></article>
+  </section>
+  <footer class="main-footer"><span>DEPTHBRIDGE STUDIO</span><span>距离：内部 m · 显示 mm <b> / </b> 变换：目标坐标系 ← 源坐标系</span></footer>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="/static/app.js"></script>
+</body></html>

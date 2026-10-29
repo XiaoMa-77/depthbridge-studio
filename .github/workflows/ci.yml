@@ -1,0 +1,61 @@
+name: Offline verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install tested Python 3.12 dependencies
+        if: matrix.python == '3.12'
+        run: python -m pip install -e ".[dev]" -c constraints-py312.txt
+      - name: Install compatible Python 3.11 dependencies
+        if: matrix.python == '3.11'
+        run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q --cov=depthbridge --cov-report=term-missing --cov-fail-under=80
+      - run: python -m ruff check src tests scripts
+      - run: python -m compileall -q src tests scripts
+      - name: Build wheel and sdist
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        run: |
+          python -m build
+          python scripts/check_distribution.py
+
+  browser:
+    name: Browser workflow
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -e ".[dev]" -c constraints-py312.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python scripts/verify_browser.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: browser-verification
+          path: qa-output/
+          retention-days: 7
