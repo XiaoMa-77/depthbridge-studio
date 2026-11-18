@@ -10,7 +10,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3555e8)
 ![License](https://img.shields.io/badge/License-MIT-1d2028)
 
-[快速开始](#快速开始) · [使用流程](#使用流程) · [系统架构](#系统架构) · [实测记录](docs/D435_相机实测记录.md) · [更新日志](CHANGELOG.md)
+[快速开始](#快速开始) · [使用流程](#使用流程) · [系统架构](#系统架构) · [设计文档](DESIGN.md) · [实测记录](docs/D435_相机实测记录.md) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -149,6 +149,8 @@ T_base_from_camera = [[R, t], [0, 0, 0, 1]]
 .\.venv\Scripts\python.exe -m build
 .\.venv\Scripts\python.exe scripts/check_distribution.py
 ```
+
+本地一键离线校验运行 `bash scripts/verify.sh`，串联 pytest、ruff、编译检查与发行包检查，不访问相机或外部服务；加 `--browser` 可追加浏览器流程。完整设计总览见 [DESIGN.md](DESIGN.md)。
 
 浏览器检查使用独立临时服务并清理进程，不切换正在使用的相机。Linux 首次运行需 `python -m playwright install --with-deps chromium`；Windows 可使用本机 Edge。CI 覆盖 Windows／Linux 的 Python 3.11、3.12 以及 Linux 浏览器流程，硬件检查单独进行。
 

@@ -115,3 +115,23 @@ def test_synthetic_chessboard_detection():
     assert np.asarray(result["camera_from_target"])[2, 3] > 0
     with pytest.raises(ValueError, match="完整棋盘格"):
         work.detect_board(1, 9, 6, 20)
+
+
+def test_session_import_rejects_synthetic_and_mode_mismatch():
+    work = Workspace()
+    real_source = copy.deepcopy(work.session)
+    real_source["synthetic"] = False
+    with pytest.raises(ValueError, match="合成"):
+        work.import_session(real_source)
+    bad_mode = copy.deepcopy(work.session)
+    bad_mode["mode"] = "unknown"
+    with pytest.raises(ValueError, match="安装方式"):
+        work.import_session(bad_mode)
+
+
+def test_session_import_rejects_excessive_selections():
+    work = Workspace()
+    value = copy.deepcopy(work.session)
+    value["selections"] = [{"camera_m": [0, 0, 0.5]}] * 2001
+    with pytest.raises(ValueError, match="过多"):
+        work.import_session(value)

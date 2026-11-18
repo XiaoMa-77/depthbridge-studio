@@ -44,3 +44,26 @@ def test_unsupported_distortion_is_not_treated_as_pinhole():
     k = Intrinsics(640, 480, 600, 600, 320, 240, "inverse_brown_conrady", [0.1, 0, 0, 0, 0])
     with pytest.raises(ValueError, match="SDK|畸变"):
         k.deproject([[320, 240]], [0.6])
+
+
+def test_transform_rejects_improper_rotation_bad_last_row_and_nonfinite():
+    reflection = np.eye(4)
+    reflection[0, 0] = -1  # 正交但行列式为 -1
+    with pytest.raises(ValueError, match="行列式"):
+        validate_transform(reflection)
+    bad_row = np.eye(4)
+    bad_row[3, 0] = 0.1
+    with pytest.raises(ValueError, match="最后一行"):
+        validate_transform(bad_row)
+    nonfinite = np.eye(4)
+    nonfinite[0, 1] = float("nan")
+    with pytest.raises(ValueError, match="NaN|数值"):
+        validate_transform(nonfinite)
+
+
+def test_fit_requires_four_points_and_transform_requires_3d_points():
+    points = [[0, 0, 0.5], [0.1, 0, 0.5], [0, 0.1, 0.5]]
+    with pytest.raises(ValueError, match="4 组"):
+        fit_rigid(points, points)
+    with pytest.raises(ValueError, match="三维"):
+        apply_transform(np.eye(4), [[1, 2]])
